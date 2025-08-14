@@ -1,0 +1,609 @@
+{% extends "base.html" %}
+
+{% block title %}Создать бота - Bot Creator Platform{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <!-- Left Panel - Bot Configuration -->
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-robot me-2"></i>Создание Telegram бота
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="botForm">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="botName" class="form-label">Название бота</label>
+                                <input type="text" class="form-control" id="botName" name="botName" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="botToken" class="form-label">Токен бота</label>
+                                <input type="text" class="form-control" id="botToken" name="botToken" 
+                                       placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz" required>
+                                <div class="form-text">
+                                    <a href="https://t.me/BotFather" target="_blank" class="text-decoration-none">
+                                        <i class="fas fa-external-link-alt me-1"></i>Получить токен у @BotFather
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="botDescription" class="form-label">Описание бота</label>
+                            <textarea class="form-control" id="botDescription" name="botDescription" rows="3" 
+                                      placeholder="Опишите, что делает ваш бот..."></textarea>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Bot Blocks Configuration -->
+            <div class="card border-0 shadow-sm mt-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-puzzle-piece me-2"></i>Конфигурация блоков
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="botBlocks">
+                        <!-- Blocks will be added here -->
+                    </div>
+                    
+                    <div class="text-center mt-3">
+                        <button type="button" class="btn btn-outline-success" onclick="addBlock()">
+                            <i class="fas fa-plus me-2"></i>Добавить блок
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel - Block Library -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-cube me-2"></i>Библиотека блоков
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <input type="text" class="form-control" id="blockSearch" 
+                               placeholder="Поиск блоков...">
+                    </div>
+                    
+                    <div id="blockLibrary">
+                        <!-- Block types will be listed here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions Panel -->
+            <div class="card border-0 shadow-sm mt-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="fas fa-cogs me-2"></i>Действия
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-primary btn-lg" onclick="generateCode()">
+                            <i class="fas fa-code me-2"></i>Сгенерировать код
+                        </button>
+                        <button type="button" class="btn btn-success btn-lg" onclick="saveBot()">
+                            <i class="fas fa-save me-2"></i>Сохранить бота
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="clearSession()">
+                            <i class="fas fa-trash me-2"></i>Очистить сессию
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Generated Code Modal -->
+<div class="modal fade" id="codeModal" tabindex="-1" aria-labelledby="codeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="codeModalLabel">
+                    <i class="fas fa-code me-2"></i>Сгенерированный Python код
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <button class="btn btn-outline-primary btn-sm" onclick="copyCode()">
+                        <i class="fas fa-copy me-1"></i>Копировать код
+                    </button>
+                    <button class="btn btn-outline-success btn-sm" onclick="downloadCode()">
+                        <i class="fas fa-download me-1"></i>Скачать файл
+                    </button>
+                </div>
+                <pre><code id="generatedCode" class="language-python"></code></pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Block types available
+const blockTypes = [
+    {
+        id: 'welcome',
+        name: 'Приветствие',
+        description: 'Команда /start',
+        icon: 'fas fa-hand-wave',
+        color: 'primary'
+    },
+    {
+        id: 'help',
+        name: 'Помощь',
+        description: 'Команда /help',
+        icon: 'fas fa-question-circle',
+        color: 'success'
+    },
+    {
+        id: 'about',
+        name: 'О боте',
+        description: 'Команда /about',
+        icon: 'fas fa-info-circle',
+        color: 'info'
+    },
+    {
+        id: 'custom',
+        name: 'Кастомный ответ',
+        description: 'Ответ на ключевые слова',
+        icon: 'fas fa-comments',
+        color: 'warning'
+    },
+    {
+        id: 'echo',
+        name: 'Эхо',
+        description: 'Повторение всех сообщений',
+        icon: 'fas fa-echo',
+        color: 'secondary'
+    }
+];
+
+let botBlocks = [];
+let blockCounter = 0;
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    loadSession();
+    renderBlockLibrary();
+    renderBlocks();
+});
+
+// Render block library
+function renderBlockLibrary() {
+    const library = document.getElementById('blockLibrary');
+    library.innerHTML = blockTypes.map(block => `
+        <div class="card mb-2 border-0 shadow-sm block-type" 
+             data-block-type="${block.id}" 
+             draggable="true">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center">
+                    <div class="bg-${block.color} bg-gradient text-white rounded-circle d-flex align-items-center justify-content-center me-3" 
+                         style="width: 40px; height: 40px;">
+                        <i class="${block.icon}"></i>
+                    </div>
+                    <div>
+                        <h6 class="mb-1">${block.name}</h6>
+                        <small class="text-muted">${block.description}</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+    
+    // Add drag and drop functionality
+    document.querySelectorAll('.block-type').forEach(block => {
+        block.addEventListener('dragstart', handleDragStart);
+    });
+}
+
+// Render current blocks
+function renderBlocks() {
+    const container = document.getElementById('botBlocks');
+    if (botBlocks.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-5 text-muted">
+                <i class="fas fa-puzzle-piece fa-3x mb-3"></i>
+                <h5>Нет добавленных блоков</h5>
+                <p>Перетащите блоки из библиотеки или нажмите "Добавить блок"</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = botBlocks.map((block, index) => `
+        <div class="card mb-3 border-0 shadow-sm" data-block-index="${index}">
+            <div class="card-header bg-${block.color} text-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">
+                    <i class="${block.icon} me-2"></i>${block.name}
+                </h6>
+                <button type="button" class="btn btn-sm btn-outline-light" onclick="removeBlock(${index})">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="card-body">
+                ${renderBlockConfig(block, index)}
+            </div>
+        </div>
+    `).join('');
+}
+
+// Render block configuration
+function renderBlockConfig(block, index) {
+    switch (block.type) {
+        case 'welcome':
+            return `
+                <div class="mb-3">
+                    <label class="form-label">Приветственное сообщение</label>
+                    <textarea class="form-control" rows="3" 
+                              onchange="updateBlockConfig(${index}, 'message', this.value)"
+                              placeholder="Введите приветственное сообщение...">${block.config.message || ''}</textarea>
+                </div>
+            `;
+        case 'help':
+            return `
+                <div class="mb-3">
+                    <label class="form-label">Список команд</label>
+                    <textarea class="form-control" rows="3" 
+                              onchange="updateBlockConfig(${index}, 'commands', this.value)"
+                              placeholder="Введите список команд...">${block.config.commands || ''}</textarea>
+                </div>
+            `;
+        case 'about':
+            return `
+                <div class="mb-3">
+                    <label class="form-label">Описание бота</label>
+                    <textarea class="form-control" rows="3" 
+                              onchange="updateBlockConfig(${index}, 'description', this.value)"
+                              placeholder="Введите описание бота...">${block.config.description || ''}</textarea>
+                </div>
+            `;
+        case 'custom':
+            return `
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="form-label">Ключевые слова</label>
+                        <input type="text" class="form-control" 
+                               onchange="updateBlockConfig(${index}, 'keywords', this.value)"
+                               placeholder="слово1, слово2, слово3" 
+                               value="${block.config.keywords || ''}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Ответ</label>
+                        <input type="text" class="form-control" 
+                               onchange="updateBlockConfig(${index}, 'response', this.value)"
+                               placeholder="Ответ на ключевые слова" 
+                               value="${block.config.response || ''}">
+                    </div>
+                </div>
+            `;
+        case 'echo':
+            return `
+                <div class="mb-3">
+                    <label class="form-label">Префикс для эхо</label>
+                    <input type="text" class="form-control" 
+                           onchange="updateBlockConfig(${index}, 'prefix', this.value)"
+                           placeholder="Эхо: " 
+                           value="${block.config.prefix || ''}">
+                </div>
+            `;
+        default:
+            return '<p class="text-muted">Конфигурация недоступна</p>';
+    }
+}
+
+// Add new block
+function addBlock() {
+    const blockType = blockTypes[0]; // Default to welcome block
+    const newBlock = {
+        id: blockCounter++,
+        type: blockType.id,
+        name: blockType.name,
+        icon: blockType.icon,
+        color: blockType.color,
+        config: {}
+    };
+    
+    botBlocks.push(newBlock);
+    renderBlocks();
+    saveSession();
+}
+
+// Remove block
+function removeBlock(index) {
+    botBlocks.splice(index, 1);
+    renderBlocks();
+    saveSession();
+}
+
+// Update block configuration
+function updateBlockConfig(index, key, value) {
+    if (botBlocks[index]) {
+        if (!botBlocks[index].config) {
+            botBlocks[index].config = {};
+        }
+        botBlocks[index].config[key] = value;
+        saveSession();
+    }
+}
+
+// Generate Python code
+function generateCode() {
+    const botName = document.getElementById('botName').value;
+    const botToken = document.getElementById('botToken').value;
+    
+    if (!botName || !botToken) {
+        alert('Пожалуйста, заполните название и токен бота');
+        return;
+    }
+    
+    if (botBlocks.length === 0) {
+        alert('Добавьте хотя бы один блок для генерации кода');
+        return;
+    }
+    
+    const code = generatePythonCode(botName, botToken, botBlocks);
+    document.getElementById('generatedCode').textContent = code;
+    
+    const modal = new bootstrap.Modal(document.getElementById('codeModal'));
+    modal.show();
+}
+
+// Generate Python code function
+function generatePythonCode(botName, botToken, blocks) {
+    let code = `#!/usr/bin/env python3
+"""
+${botName} - Telegram Bot
+Создан с помощью Bot Creator Platform
+"""
+
+import telebot
+import logging
+from datetime import datetime
+
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Инициализация бота
+bot = telebot.TeleBot('${botToken}')
+
+# Обработчики команд
+`;
+
+    blocks.forEach(block => {
+        switch (block.type) {
+            case 'welcome':
+                code += `
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    """Обработчик команды /start"""
+    try:
+        welcome_message = """${block.config.message || 'Добро пожаловать! Я ваш новый Telegram бот.'}"""
+        bot.reply_to(message, welcome_message)
+        logger.info(f"User {message.from_user.id} started the bot")
+    except Exception as e:
+        logger.error(f"Error in send_welcome: {e}")
+        bot.reply_to(message, "Произошла ошибка. Попробуйте позже.")
+`;
+                break;
+            case 'help':
+                code += `
+@bot.message_handler(commands=['help'])
+def send_help(message):
+    """Обработчик команды /help"""
+    try:
+        help_text = """${block.config.commands || 'Доступные команды:\\n/start - Начать работу\\n/help - Помощь\\n/about - О боте'}"""
+        bot.reply_to(message, help_text)
+        logger.info(f"User {message.from_user.id} requested help")
+    except Exception as e:
+        logger.error(f"Error in send_help: {e}")
+        bot.reply_to(message, "Произошла ошибка. Попробуйте позже.")
+`;
+                break;
+            case 'about':
+                code += `
+@bot.message_handler(commands=['about'])
+def send_about(message):
+    """Обработчик команды /about"""
+    try:
+        about_text = """${block.config.description || 'Этот бот создан с помощью Bot Creator Platform.\\nВерсия: 1.0\\nДата создания: ' + datetime.now().strftime('%d.%m.%Y')}"""
+        bot.reply_to(message, about_text)
+        logger.info(f"User {message.from_user.id} requested about info")
+    except Exception as e:
+        logger.error(f"Error in send_about: {e}")
+        bot.reply_to(message, "Произошла ошибка. Попробуйте позже.")
+`;
+                break;
+            case 'custom':
+                if (block.config.keywords && block.config.response) {
+                    const keywords = block.config.keywords.split(',').map(k => k.trim());
+                    code += `
+@bot.message_handler(func=lambda message: any(keyword.lower() in message.text.lower() for keyword in ${JSON.stringify(keywords)}))
+def custom_response(message):
+    """Обработчик кастомных ключевых слов"""
+    try:
+        response = """${block.config.response}"""
+        bot.reply_to(message, response)
+        logger.info(f"User {message.from_user.id} triggered custom response")
+    except Exception as e:
+        logger.error(f"Error in custom_response: {e}")
+        bot.reply_to(message, "Произошла ошибка. Попробуйте позже.")
+`;
+                }
+                break;
+            case 'echo':
+                code += `
+@bot.message_handler(func=lambda message: True)
+def echo_all(message):
+    """Эхо всех сообщений"""
+    try:
+        prefix = """${block.config.prefix || 'Эхо: '}"""
+        bot.reply_to(message, prefix + message.text)
+        logger.info(f"User {message.from_user.id} sent message: {message.text}")
+    except Exception as e:
+        logger.error(f"Error in echo_all: {e}")
+        bot.reply_to(message, "Произошла ошибка. Попробуйте позже.")
+`;
+                break;
+        }
+    });
+    
+    code += `
+
+# Запуск бота
+if __name__ == '__main__':
+    try:
+        logger.info("Starting bot...")
+        bot.polling(timeout=60)
+    except KeyboardInterrupt:
+        logger.info("Bot stopped by user")
+    except Exception as e:
+        logger.error(f"Bot error: {e}")
+`;
+    
+    return code;
+}
+
+// Save bot
+function saveBot() {
+    const botName = document.getElementById('botName').value;
+    const botToken = document.getElementById('botToken').value;
+    const botDescription = document.getElementById('botDescription').value;
+    
+    if (!botName || !botToken) {
+        alert('Пожалуйста, заполните название и токен бота');
+        return;
+    }
+    
+    if (botBlocks.length === 0) {
+        alert('Добавьте хотя бы один блок для сохранения бота');
+        return;
+    }
+    
+    const botData = {
+        name: botName,
+        token: botToken,
+        description: botDescription,
+        config: botBlocks,
+        python_code: generatePythonCode(botName, botToken, botBlocks)
+    };
+    
+    // Save to server
+    fetch('/api/save-bot', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(botData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Бот успешно сохранен!');
+            clearSession();
+        } else {
+            alert('Ошибка при сохранении: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Произошла ошибка при сохранении бота');
+    });
+}
+
+// Copy code to clipboard
+function copyCode() {
+    const codeElement = document.getElementById('generatedCode');
+    const textArea = document.createElement('textarea');
+    textArea.value = codeElement.textContent;
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textArea);
+    alert('Код скопирован в буфер обмена!');
+}
+
+// Download code as file
+function downloadCode() {
+    const codeElement = document.getElementById('generatedCode');
+    const blob = new Blob([codeElement.textContent], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'bot.py';
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+
+// Clear session
+function clearSession() {
+    botBlocks = [];
+    blockCounter = 0;
+    document.getElementById('botForm').reset();
+    renderBlocks();
+    saveSession();
+}
+
+// Save session to localStorage
+function saveSession() {
+    const sessionData = {
+        botBlocks: botBlocks,
+        blockCounter: blockCounter,
+        formData: {
+            botName: document.getElementById('botName').value,
+            botToken: document.getElementById('botToken').value,
+            botDescription: document.getElementById('botDescription').value
+        }
+    };
+    localStorage.setItem('botCreatorSession', JSON.stringify(sessionData));
+}
+
+// Load session from localStorage
+function loadSession() {
+    const sessionData = localStorage.getItem('botCreatorSession');
+    if (sessionData) {
+        try {
+            const data = JSON.parse(sessionData);
+            botBlocks = data.botBlocks || [];
+            blockCounter = data.blockCounter || 0;
+            
+            if (data.formData) {
+                document.getElementById('botName').value = data.formData.botName || '';
+                document.getElementById('botToken').value = data.formData.botToken || '';
+                document.getElementById('botDescription').value = data.formData.botDescription || '';
+            }
+        } catch (e) {
+            console.error('Error loading session:', e);
+        }
+    }
+}
+
+// Drag and drop functionality
+function handleDragStart(e) {
+    e.dataTransfer.setData('text/plain', e.target.dataset.blockType);
+}
+
+// Auto-save on form changes
+document.getElementById('botForm').addEventListener('input', saveSession);
+</script>
+{% endblock %}
