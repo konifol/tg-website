@@ -2,12 +2,15 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_mail import Mail, Message
 import os
 import json
 from datetime import datetime, timedelta
 import requests
 from dotenv import load_dotenv
 from functools import wraps
+import secrets
+import urllib.parse
 
 # Load environment variables
 load_dotenv()
@@ -40,6 +43,18 @@ login_manager.login_view = 'login'
 # Google OAuth configuration
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', 'your-google-client-id')
 GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', 'your-google-client-secret')
+GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', 'http://localhost:5002/google-callback')
+
+# Email configuration
+app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
+app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'True').lower() == 'true'
+app.config['MAIL_USE_SSL'] = os.environ.get('MAIL_USE_SSL', 'False').lower() == 'true'
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', 'your-email@gmail.com')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', 'your-app-password')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', 'your-email@gmail.com')
+
+mail = Mail(app)
 
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
@@ -100,6 +115,26 @@ class BotSession(db.Model):
     
     def __repr__(self):
         return f'<BotSession {self.id} for user {self.user_id}>'
+
+class PasswordResetToken(db.Model):
+    __tablename__ = 'password_reset_tokens'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    token = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    user = db.relationship('User', backref='password_reset_tokens')
+    
+    def __repr__(self):
+        return f'<PasswordResetToken {self.id}>'
+    
+    @property
+    def is_expired(self):
+        return datetime.utcnow() > self.expires_at
 
 # Admin decorator
 def admin_required(f):
@@ -191,26 +226,91 @@ def login():
 
 @app.route('/google-login')
 def google_login():
-    # Google OAuth flow would be implemented here
-    # For now, we'll simulate it
-    return redirect(url_for('google_callback'))
+    """Initiate Google OAuth flow"""
+    # Generate state parameter for security
+    state = secrets.token_urlsafe(32)
+    session['oauth_state'] = state
+    
+    # Build Google OAuth URL
+    params = {
+        'client_id': GOOGLE_CLIENT_ID,
+        'redirect_uri': GOOGLE_REDIRECT_URI,
+        'scope': 'openid email profile',
+        'response_type': 'code',
+        'state': state,
+        'access_type': 'offline'
+    }
+    
+    google_auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urllib.parse.urlencode(params)}"
+    return redirect(google_auth_url)
 
 @app.route('/google-callback')
 def google_callback():
-    # In a real implementation, this would handle the OAuth callback
-    # For demo purposes, we'll create a mock user
-    mock_user = User.query.filter_by(email='demo@google.com').first()
-    if not mock_user:
-        mock_user = User(
-            email='demo@google.com',
-            name='Demo Google User',
-            google_id='google_123'
-        )
-        db.session.add(mock_user)
-        db.session.commit()
+    """Handle Google OAuth callback"""
+    # Verify state parameter
+    state = request.args.get('state')
+    if not state or state != session.get('oauth_state'):
+        flash('Ошибка авторизации: неверный state параметр', 'error')
+        return redirect(url_for('login'))
     
-    login_user(mock_user)
-    return redirect(url_for('dashboard'))
+    # Get authorization code
+    code = request.args.get('code')
+    if not code:
+        flash('Ошибка авторизации: код не получен', 'error')
+        return redirect(url_for('login'))
+    
+    try:
+        # Exchange code for access token
+        token_url = 'https://oauth2.googleapis.com/token'
+        token_data = {
+            'client_id': GOOGLE_CLIENT_ID,
+            'client_secret': GOOGLE_CLIENT_SECRET,
+            'code': code,
+            'grant_type': 'authorization_code',
+            'redirect_uri': GOOGLE_REDIRECT_URI
+        }
+        
+        token_response = requests.post(token_url, data=token_data)
+        token_response.raise_for_status()
+        token_info = token_response.json()
+        
+        # Get user info using access token
+        user_info_url = 'https://www.googleapis.com/oauth2/v2/userinfo'
+        headers = {'Authorization': f"Bearer {token_info['access_token']}"}
+        user_response = requests.get(user_info_url, headers=headers)
+        user_response.raise_for_status()
+        user_info = user_response.json()
+        
+        # Find or create user
+        user = User.query.filter_by(google_id=user_info['id']).first()
+        if not user:
+            # Check if email already exists
+            existing_user = User.query.filter_by(email=user_info['email']).first()
+            if existing_user:
+                # Link existing account to Google
+                existing_user.google_id = user_info['id']
+                user = existing_user
+            else:
+                # Create new user
+                user = User(
+                    email=user_info['email'],
+                    name=user_info.get('name', user_info['email']),
+                    google_id=user_info['id']
+                )
+                db.session.add(user)
+        
+        db.session.commit()
+        login_user(user)
+        flash('Вход через Google выполнен успешно!', 'success')
+        
+        # Clean up session
+        session.pop('oauth_state', None)
+        
+        return redirect(url_for('dashboard'))
+        
+    except Exception as e:
+        flash(f'Ошибка авторизации через Google: {str(e)}', 'error')
+        return redirect(url_for('login'))
 
 @app.route('/logout')
 @login_required
@@ -228,6 +328,102 @@ def dashboard():
 @login_required
 def create_bot():
     return render_template('create_bot.html')
+
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    """Handle forgot password request"""
+    if request.method == 'POST':
+        email = request.form.get('email')
+        
+        if not email:
+            flash('Введите email адрес', 'error')
+            return render_template('forgot_password.html')
+        
+        user = User.query.filter_by(email=email).first()
+        if user:
+            try:
+                # Generate reset token
+                token = secrets.token_urlsafe(32)
+                expires_at = datetime.utcnow() + timedelta(hours=24)
+                
+                # Save token to database
+                reset_token = PasswordResetToken(
+                    user_id=user.id,
+                    token=token,
+                    expires_at=expires_at
+                )
+                db.session.add(reset_token)
+                db.session.commit()
+                
+                # Send email
+                reset_url = url_for('reset_password', token=token, _external=True)
+                
+                msg = Message(
+                    'Восстановление пароля - Bot Creator Platform',
+                    recipients=[user.email]
+                )
+                msg.html = render_template('emails/reset_password.html', 
+                                         user=user, reset_url=reset_url)
+                
+                mail.send(msg)
+                
+                flash('Инструкции по восстановлению пароля отправлены на ваш email', 'success')
+                return redirect(url_for('login'))
+                
+            except Exception as e:
+                db.session.rollback()
+                flash('Ошибка при отправке email. Попробуйте еще раз.', 'error')
+        else:
+            # Don't reveal if user exists
+            flash('Если пользователь с таким email существует, инструкции будут отправлены', 'info')
+        
+        return redirect(url_for('login'))
+    
+    return render_template('forgot_password.html')
+
+@app.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    """Handle password reset"""
+    reset_token = PasswordResetToken.query.filter_by(token=token, used=False).first()
+    
+    if not reset_token or reset_token.is_expired:
+        flash('Ссылка для восстановления пароля недействительна или истекла', 'error')
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        
+        if not password or not confirm_password:
+            flash('Заполните все поля', 'error')
+            return render_template('reset_password.html', token=token)
+        
+        if password != confirm_password:
+            flash('Пароли не совпадают', 'error')
+            return render_template('reset_password.html', token=token)
+        
+        if len(password) < 6:
+            flash('Пароль должен содержать минимум 6 символов', 'error')
+            return render_template('reset_password.html', token=token)
+        
+        try:
+            # Update password
+            user = reset_token.user
+            user.password_hash = generate_password_hash(password)
+            
+            # Mark token as used
+            reset_token.used = True
+            
+            db.session.commit()
+            
+            flash('Пароль успешно изменен! Теперь вы можете войти с новым паролем.', 'success')
+            return redirect(url_for('login'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash('Ошибка при изменении пароля. Попробуйте еще раз.', 'error')
+    
+    return render_template('reset_password.html', token=token)
 
 # Admin routes
 @app.route('/admin')
@@ -651,6 +847,117 @@ def create_admin():
     db.session.add(admin)
     db.session.commit()
     print(f"Admin user {email} created successfully!")
+
+# API Routes
+@app.route('/api/create-bot', methods=['POST'])
+@login_required
+def create_bot_api():
+    data = request.get_json()
+    
+    if not data or 'name' not in data or 'config' not in data:
+        return jsonify({'error': 'Missing required fields'}), 400
+    
+    try:
+        # Generate Python code from config
+        python_code = generate_bot_code(data['config'])
+        
+        bot = Bot(
+            name=data['name'],
+            config=json.dumps(data['config']),
+            python_code=python_code,
+            user_id=current_user.id
+        )
+        
+        db.session.add(bot)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'bot_id': bot.id})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/bot-blocks', methods=['GET'])
+@login_required
+def get_bot_blocks():
+    """Get available bot blocks with descriptions"""
+    blocks = {
+        'message': {
+            'name': 'Сообщение',
+            'description': 'Отправляет текстовое сообщение пользователю',
+            'icon': 'fas fa-comment',
+            'color': 'primary',
+            'fields': [
+                {'name': 'text', 'type': 'textarea', 'label': 'Текст сообщения', 'required': True}
+            ]
+        },
+        'photo': {
+            'name': 'Фото',
+            'description': 'Отправляет изображение с подписью',
+            'icon': 'fas fa-image',
+            'color': 'success',
+            'fields': [
+                {'name': 'photo_url', 'type': 'url', 'label': 'URL изображения', 'required': True},
+                {'name': 'caption', 'type': 'textarea', 'label': 'Подпись к фото', 'required': False}
+            ]
+        },
+        'document': {
+            'name': 'Документ',
+            'description': 'Отправляет файл пользователю',
+            'icon': 'fas fa-file',
+            'color': 'text-info',
+            'icon': 'fas fa-file',
+            'color': 'info',
+            'fields': [
+                {'name': 'document_url', 'type': 'url', 'label': 'URL документа', 'required': True},
+                {'name': 'caption', 'type': 'textarea', 'label': 'Описание документа', 'required': False}
+            ]
+        },
+        'inline_keyboard': {
+            'name': 'Инлайн кнопки',
+            'description': 'Создает интерактивные кнопки под сообщением',
+            'icon': 'fas fa-keyboard',
+            'color': 'warning',
+            'fields': [
+                {'name': 'buttons', 'type': 'json', 'label': 'JSON структура кнопок', 'required': True},
+                {'name': 'text', 'type': 'textarea', 'label': 'Текст сообщения с кнопками', 'required': True}
+            ]
+        },
+        'reply_keyboard': {
+            'name': 'Клавиатура',
+            'description': 'Создает постоянную клавиатуру для пользователя',
+            'icon': 'fas fa-keyboard',
+            'color': 'secondary',
+            'fields': [
+                {'name': 'buttons', 'type': 'json', 'label': 'JSON структура кнопок', 'required': True},
+                {'name': 'resize', 'type': 'checkbox', 'label': 'Автоматически изменять размер', 'required': False},
+                {'name': 'one_time', 'type': 'checkbox', 'label': 'Одноразовая клавиатура', 'required': False}
+            ]
+        },
+        'condition': {
+            'name': 'Условие',
+            'description': 'Выполняет действия в зависимости от условия',
+            'icon': 'fas fa-code-branch',
+            'color': 'dark',
+            'fields': [
+                {'name': 'condition', 'type': 'text', 'label': 'Условие (Python код)', 'required': True},
+                {'name': 'true_action', 'type': 'text', 'label': 'Действие если True', 'required': True},
+                {'name': 'false_action', 'type': 'text', 'label': 'Действие если False', 'required': False}
+            ]
+        },
+        'loop': {
+            'name': 'Цикл',
+            'description': 'Повторяет действия заданное количество раз',
+            'icon': 'fas fa-redo',
+            'color': 'info',
+            'fields': [
+                {'name': 'iterations', 'type': 'number', 'label': 'Количество повторений', 'required': True},
+                {'name': 'action', 'type': 'text', 'label': 'Действие для повторения', 'required': True}
+            ]
+        }
+    }
+    
+    return jsonify(blocks)
 
 if __name__ == '__main__':
     with app.app_context():
