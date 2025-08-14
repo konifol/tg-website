@@ -92,7 +92,6 @@
     margin-right: 5px;
 }
 </style>
-
 <div class="container-fluid mt-4">
     <div class="row">
         <!-- Left Panel - Bot Configuration -->
@@ -230,7 +229,7 @@
 </div>
 
 <script>
-// Block types available with descriptions and fields
+// Block types available
 const blockTypes = [
     {
         id: 'welcome',
@@ -360,45 +359,7 @@ document.addEventListener('DOMContentLoaded', function() {
     loadSession();
     renderBlockLibrary();
     renderBlocks();
-    
-    // Add search functionality
-    document.getElementById('blockSearch').addEventListener('input', function() {
-        filterBlocks(this.value);
-    });
 });
-
-// Filter blocks by search
-function filterBlocks(searchTerm) {
-    const library = document.getElementById('blockLibrary');
-    const filteredBlocks = blockTypes.filter(block => 
-        block.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        block.description.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    
-    library.innerHTML = filteredBlocks.map(block => `
-        <div class="card mb-2 border-0 shadow-sm block-type" 
-             data-block-type="${block.id}" 
-             draggable="true">
-            <div class="card-body p-3">
-                <div class="d-flex align-items-center">
-                    <div class="bg-${block.color} bg-gradient text-white rounded-circle d-flex align-items-center justify-content-center me-3" 
-                         style="width: 40px; height: 40px;">
-                        <i class="${block.icon}"></i>
-                    </div>
-                    <div>
-                        <h6 class="mb-1">${block.name}</h6>
-                        <small class="text-muted">${block.description}</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `).join('');
-    
-    // Re-add drag functionality
-    document.querySelectorAll('.block-type').forEach(block => {
-        block.addEventListener('dragstart', handleDragStart);
-    });
-}
 
 // Render block library
 function renderBlockLibrary() {
@@ -448,7 +409,9 @@ function renderBlocks() {
                 <h6 class="mb-0">
                     <i class="${block.icon} me-2"></i>${block.name}
                 </h6>
-                <span class="badge bg-light text-dark">${index + 1}</span>
+                <button type="button" class="btn btn-sm btn-outline-light" onclick="removeBlock(${index})">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
             <div class="card-body">
                 ${renderBlockConfig(block, index)}
@@ -457,183 +420,92 @@ function renderBlocks() {
     `).join('');
 }
 
-// Render block configuration with dynamic fields
+// Render block configuration
 function renderBlockConfig(block, index) {
-    const blockType = blockTypes.find(bt => bt.id === block.type);
-    if (!blockType) return '<p class="text-muted">Конфигурация недоступна</p>';
-    
-    let configHtml = `
-        <div class="block-info">
-            <i class="fas fa-info-circle"></i>
-            <strong>${blockType.name}:</strong> ${blockType.description}
-        </div>
-        <div class="block-config">
-    `;
-    
-    if (blockType.fields) {
-        blockType.fields.forEach(field => {
-            const fieldValue = block.config[field.name] || '';
-            const requiredClass = field.required ? 'required-field' : '';
-            
-            switch (field.type) {
-                case 'textarea':
-                    configHtml += `
-                        <div class="field-group">
-                            <label class="form-label ${requiredClass}">${field.label}</label>
-                            <textarea class="form-control" rows="3" 
-                                      onchange="updateBlockConfig(${index}, '${field.name}', this.value)"
-                                      placeholder="${field.label}">${fieldValue}</textarea>
-                        </div>
-                    `;
-                    break;
-                case 'text':
-                    configHtml += `
-                        <div class="field-group">
-                            <label class="form-label ${requiredClass}">${field.label}</label>
-                            <input type="text" class="form-control" 
-                                   onchange="updateBlockConfig(${index}, '${field.name}', this.value)"
-                                   placeholder="${field.label}" 
-                                   value="${fieldValue}">
-                        </div>
-                    `;
-                    break;
-                case 'url':
-                    configHtml += `
-                        <div class="field-group">
-                            <label class="form-label ${requiredClass}">${field.label}</label>
-                            <input type="url" class="form-control" 
-                                   onchange="updateBlockConfig(${index}, '${field.name}', this.value)"
-                                   placeholder="https://example.com/image.jpg" 
-                                   value="${fieldValue}">
-                        </div>
-                    `;
-                    break;
-                case 'number':
-                    configHtml += `
-                        <div class="field-group">
-                            <label class="form-label ${requiredClass}">${field.label}</label>
-                            <input type="number" class="form-control" 
-                                   onchange="updateBlockConfig(${index}, '${field.name}', this.value)"
-                                   placeholder="1" 
-                                   value="${fieldValue}">
-                        </div>
-                    `;
-                    break;
-                case 'json':
-                    configHtml += `
-                        <div class="field-group">
-                            <label class="form-label ${requiredClass}">${field.label}</label>
-                            <textarea class="form-control" rows="4" 
-                                      onchange="updateBlockConfig(${index}, '${field.name}', this.value)"
-                                      placeholder='[["Кнопка 1"], ["Кнопка 2"]]'>${fieldValue}</textarea>
-                            <small class="form-text text-muted">
-                                <i class="fas fa-code"></i> Введите JSON структуру кнопок
-                            </small>
-                        </div>
-                    `;
-                    break;
-                case 'checkbox':
-                    configHtml += `
-                        <div class="field-group">
-                            <div class="form-check">
-                                <input type="checkbox" class="form-check-input" 
-                                       onchange="updateBlockConfig(${index}, '${field.name}', this.checked)"
-                                       ${fieldValue ? 'checked' : ''}>
-                                <label class="form-check-label">${field.label}</label>
-                            </div>
-                        </div>
-                    `;
-                    break;
-                default:
-                    configHtml += `
-                        <div class="field-group">
-                            <label class="form-label ${requiredClass}">${field.label}</label>
-                            <input type="text" class="form-control" 
-                                   onchange="updateBlockConfig(${index}, '${field.name}', this.value)"
-                                   placeholder="${field.label}" 
-                                   value="${fieldValue}">
-                        </div>
-                    `;
-            }
-        });
+    switch (block.type) {
+        case 'welcome':
+            return `
+                <div class="mb-3">
+                    <label class="form-label">Приветственное сообщение</label>
+                    <textarea class="form-control" rows="3" 
+                              onchange="updateBlockConfig(${index}, 'message', this.value)"
+                              placeholder="Введите приветственное сообщение...">${block.config.message || ''}</textarea>
+                </div>
+            `;
+        case 'help':
+            return `
+                <div class="mb-3">
+                    <label class="form-label">Список команд</label>
+                    <textarea class="form-control" rows="3" 
+                              onchange="updateBlockConfig(${index}, 'commands', this.value)"
+                              placeholder="Введите список команд...">${block.config.commands || ''}</textarea>
+                </div>
+            `;
+        case 'about':
+            return `
+                <div class="mb-3">
+                    <label class="form-label">Описание бота</label>
+                    <textarea class="form-control" rows="3" 
+                              onchange="updateBlockConfig(${index}, 'description', this.value)"
+                              placeholder="Введите описание бота...">${block.config.description || ''}</textarea>
+                </div>
+            `;
+        case 'custom':
+            return `
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="form-label">Ключевые слова</label>
+                        <input type="text" class="form-control" 
+                               onchange="updateBlockConfig(${index}, 'keywords', this.value)"
+                               placeholder="слово1, слово2, слово3" 
+                               value="${block.config.keywords || ''}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Ответ</label>
+                        <input type="text" class="form-control" 
+                               onchange="updateBlockConfig(${index}, 'response', this.value)"
+                               placeholder="Ответ на ключевые слова" 
+                               value="${block.config.response || ''}">
+                    </div>
+                </div>
+            `;
+        case 'echo':
+            return `
+                <div class="mb-3">
+                    <label class="form-label">Префикс для эхо</label>
+                    <input type="text" class="form-control" 
+                           onchange="updateBlockConfig(${index}, 'prefix', this.value)"
+                           placeholder="Эхо: " 
+                           value="${block.config.prefix || ''}">
+                </div>
+            `;
+        default:
+            return '<p class="text-muted">Конфигурация недоступна</p>';
     }
-    
-    configHtml += `
-        </div>
-        <div class="block-actions">
-            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="moveBlockUp(${index})" ${index === 0 ? 'disabled' : ''}>
-                <i class="fas fa-arrow-up"></i> Вверх
-            </button>
-            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="moveBlockDown(${index})" ${index === botBlocks.length - 1 ? 'disabled' : ''}>
-                <i class="fas fa-arrow-down"></i> Вниз
-            </button>
-            <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeBlock(${index})">
-                <i class="fas fa-trash"></i> Удалить
-            </button>
-        </div>
-    `;
-    
-    return configHtml;
 }
 
 // Add new block
 function addBlock() {
     const blockType = blockTypes[0]; // Default to welcome block
-    addBlockByType(blockType.id);
-}
-
-// Add block by type
-function addBlockByType(blockTypeId) {
-    const blockType = blockTypes.find(bt => bt.id === blockTypeId);
-    if (blockType) {
-        const newBlock = {
-            id: blockCounter++,
-            type: blockType.id,
-            name: blockType.name,
-            icon: blockType.icon,
-            color: blockType.color,
-            config: {}
-        };
-        
-        botBlocks.push(newBlock);
-        renderBlocks();
-        saveSession();
-        
-        // Scroll to the new block
-        setTimeout(() => {
-            const newBlockElement = document.querySelector(`[data-block-index="${botBlocks.length - 1}"]`);
-            if (newBlockElement) {
-                newBlockElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-        }, 100);
-    }
+    const newBlock = {
+        id: blockCounter++,
+        type: blockType.id,
+        name: blockType.name,
+        icon: blockType.icon,
+        color: blockType.color,
+        config: {}
+    };
+    
+    botBlocks.push(newBlock);
+    renderBlocks();
+    saveSession();
 }
 
 // Remove block
 function removeBlock(index) {
-    if (confirm('Вы уверены, что хотите удалить этот блок?')) {
-        botBlocks.splice(index, 1);
-        renderBlocks();
-        saveSession();
-    }
-}
-
-// Move block up
-function moveBlockUp(index) {
-    if (index > 0) {
-        [botBlocks[index], botBlocks[index - 1]] = [botBlocks[index - 1], botBlocks[index]];
-        renderBlocks();
-        saveSession();
-    }
-}
-
-// Move block down
-function moveBlockDown(index) {
-    if (index < botBlocks.length - 1) {
-        [botBlocks[index], botBlocks[index + 1]] = [botBlocks[index + 1], botBlocks[index]];
-        renderBlocks();
-        saveSession();
-    }
+    botBlocks.splice(index, 1);
+    renderBlocks();
+    saveSession();
 }
 
 // Update block configuration
@@ -644,40 +516,6 @@ function updateBlockConfig(index, key, value) {
         }
         botBlocks[index].config[key] = value;
         saveSession();
-    }
-}
-
-// Drag and drop functionality
-function handleDragStart(e) {
-    e.dataTransfer.setData('text/plain', e.target.dataset.blockType);
-    e.dataTransfer.effectAllowed = 'copy';
-}
-
-function handleDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
-}
-
-function handleDragEnter(e) {
-    e.preventDefault();
-    const dropZone = document.getElementById('botBlocks');
-    dropZone.classList.add('drag-over');
-}
-
-function handleDragLeave(e) {
-    e.preventDefault();
-    const dropZone = document.getElementById('botBlocks');
-    dropZone.classList.remove('drag-over');
-}
-
-function handleDrop(e) {
-    e.preventDefault();
-    const dropZone = document.getElementById('botBlocks');
-    dropZone.classList.remove('drag-over');
-    
-    const blockType = e.dataTransfer.getData('text/plain');
-    if (blockType) {
-        addBlockByType(blockType);
     }
 }
 
@@ -712,7 +550,6 @@ ${botName} - Telegram Bot
 """
 
 import telebot
-from telebot import types
 import logging
 from datetime import datetime
 
@@ -772,48 +609,6 @@ def send_about(message):
         logger.error(f"Error in send_about: {e}")
         bot.reply_to(message, "Произошла ошибка. Попробуйте позже.")
 `;
-                break;
-            case 'inline_keyboard':
-                if (block.config.text && block.config.buttons) {
-                    code += `
-@bot.message_handler(commands=['menu'])
-def show_menu(message):
-    """Показать меню с инлайн кнопками"""
-    try:
-        markup = types.InlineKeyboardMarkup()
-        buttons_data = ${block.config.buttons}
-        
-        for row in buttons_data:
-            markup.row(*[types.InlineKeyboardButton(text=btn, callback_data=btn.lower().replace(' ', '_')) for btn in row])
-        
-        bot.reply_to(message, """${block.config.text}""", reply_markup=markup)
-        logger.info(f"User {message.from_user.id} requested menu")
-    except Exception as e:
-        logger.error(f"Error in show_menu: {e}")
-        bot.reply_to(message, "Произошла ошибка. Попробуйте позже.")
-`;
-                }
-                break;
-            case 'reply_keyboard':
-                if (block.config.buttons) {
-                    code += `
-@bot.message_handler(commands=['keyboard'])
-def show_keyboard(message):
-    """Показать клавиатуру"""
-    try:
-        markup = types.ReplyKeyboardMarkup(resize_keyboard=${block.config.resize || false}, one_time_keyboard=${block.config.one_time || false})
-        buttons_data = ${block.config.buttons}
-        
-        for row in buttons_data:
-            markup.row(*[types.KeyboardButton(btn) for btn in row])
-        
-        bot.reply_to(message, "Выберите опцию:", reply_markup=markup)
-        logger.info(f"User {message.from_user.id} requested keyboard")
-    except Exception as e:
-        logger.error(f"Error in show_keyboard: {e}")
-        bot.reply_to(message, "Произошла ошибка. Попробуйте позже.")
-`;
-                }
                 break;
             case 'custom':
                 if (block.config.keywords && block.config.response) {
@@ -890,7 +685,7 @@ function saveBot() {
     };
     
     // Save to server
-    fetch('/api/create-bot', {
+    fetch('/api/save-bot', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -903,7 +698,7 @@ function saveBot() {
             alert('Бот успешно сохранен!');
             clearSession();
         } else {
-            alert('Ошибка при сохранении: ' + data.error);
+            alert('Ошибка при сохранении: ' + data.message);
         }
     })
     .catch(error => {
@@ -938,13 +733,11 @@ function downloadCode() {
 
 // Clear session
 function clearSession() {
-    if (confirm('Вы уверены, что хотите очистить все данные?')) {
-        botBlocks = [];
-        blockCounter = 0;
-        document.getElementById('botForm').reset();
-        renderBlocks();
-        saveSession();
-    }
+    botBlocks = [];
+    blockCounter = 0;
+    document.getElementById('botForm').reset();
+    renderBlocks();
+    saveSession();
 }
 
 // Save session to localStorage
@@ -978,6 +771,66 @@ function loadSession() {
         } catch (e) {
             console.error('Error loading session:', e);
         }
+    }
+}
+
+// Drag and drop functionality
+function handleDragStart(e) {
+    e.dataTransfer.setData('text/plain', e.target.dataset.blockType);
+    e.dataTransfer.effectAllowed = 'copy';
+}
+
+function handleDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+}
+
+function handleDragEnter(e) {
+    e.preventDefault();
+    const dropZone = document.getElementById('botBlocks');
+    dropZone.classList.add('drag-over');
+}
+
+function handleDragLeave(e) {
+    e.preventDefault();
+    const dropZone = document.getElementById('botBlocks');
+    dropZone.classList.remove('drag-over');
+}
+
+function handleDrop(e) {
+    e.preventDefault();
+    const dropZone = document.getElementById('botBlocks');
+    dropZone.classList.remove('drag-over');
+    
+    const blockType = e.dataTransfer.getData('text/plain');
+    if (blockType) {
+        addBlockByType(blockType);
+    }
+}
+
+function addBlockByType(blockTypeId) {
+    const blockType = blockTypes.find(bt => bt.id === blockTypeId);
+    if (blockType) {
+        const newBlock = {
+            id: blockCounter++,
+            type: blockType.id,
+            name: blockType.name,
+            icon: blockType.icon,
+            color: blockType.color,
+            config: {}
+        };
+        
+        botBlocks.push(newBlock);
+        renderBlocks();
+        saveSession();
+        
+        // Scroll to the new block
+        setTimeout(() => {
+            const newBlockElement = document.querySelector(`[data-block-index="${botBlocks.length - 1}"]`);
+            if (newBlockElement) {
+                newBlockElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, 100);
     }
 }
 
