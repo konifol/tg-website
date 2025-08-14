@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Проверка create_bot.html</title>
+</head>
+<body>
+    <h1>Проверка файла create_bot.html</h1>
+    
+    <h2>Проверка наличия ключевых элементов:</h2>
+    <div id="results"></div>
+    
+    <script>
+        // Загружаем содержимое файла
+        fetch('/templates/create_bot.html')
+            .then(response => response.text())
+            .then(content => {
+                const results = document.getElementById('results');
+                let checks = [];
+                
+                // Проверяем наличие ключевых элементов
+                checks.push({
+                    name: 'Библиотека блоков',
+                    found: content.includes('Библиотека блоков'),
+                    element: 'h5'
+                });
+                
+                checks.push({
+                    name: 'Конфигурация блоков',
+                    found: content.includes('Конфигурация блоков'),
+                    element: 'h5'
+                });
+                
+                checks.push({
+                    name: 'drop-zone',
+                    found: content.includes('drop-zone'),
+                    element: 'div'
+                });
+                
+                checks.push({
+                    name: 'blockTypes array',
+                    found: content.includes('const blockTypes = ['),
+                    element: 'JavaScript'
+                });
+                
+                checks.push({
+                    name: 'renderBlockLibrary function',
+                    found: content.includes('function renderBlockLibrary()'),
+                    element: 'JavaScript'
+                });
+                
+                checks.push({
+                    name: 'handleDrop function',
+                    found: content.includes('function handleDrop('),
+                    element: 'JavaScript'
+                });
+                
+                // Выводим результаты
+                checks.forEach(check => {
+                    const status = check.found ? '✅' : '❌';
+                    results.innerHTML += `<p>${status} ${check.name} (${check.element})</p>`;
+                });
+                
+                // Подсчитываем количество блоков
+                const blockMatches = content.match(/id: '([^']+)'/g);
+                if (blockMatches) {
+                    results.innerHTML += `<p>✅ Найдено блоков: ${blockMatches.length}</p>`;
+                } else {
+                    results.innerHTML += `<p>❌ Блоки не найдены</p>`;
+                }
+            })
+            .catch(error => {
+                document.getElementById('results').innerHTML = `<p>❌ Ошибка загрузки файла: ${error}</p>`;
+            });
+    </script>
+</body>
+</html>
