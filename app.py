@@ -124,40 +124,68 @@ def index():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        data = request.get_json()
-        email = data.get('email')
-        password = data.get('password')
-        name = data.get('name')
+        # Get form data instead of JSON
+        email = request.form.get('email')
+        password = request.form.get('password')
+        name = request.form.get('name')
+        confirm_password = request.form.get('confirm_password')
+        
+        # Validation
+        if not all([email, password, name, confirm_password]):
+            flash('Все поля обязательны для заполнения', 'error')
+            return render_template('register.html')
+        
+        if password != confirm_password:
+            flash('Пароли не совпадают', 'error')
+            return render_template('register.html')
+        
+        if len(password) < 6:
+            flash('Пароль должен содержать минимум 6 символов', 'error')
+            return render_template('register.html')
         
         if User.query.filter_by(email=email).first():
-            return jsonify({'error': 'Email already registered'}), 400
+            flash('Пользователь с таким email уже зарегистрирован', 'error')
+            return render_template('register.html')
         
-        user = User(
-            email=email,
-            name=name,
-            password_hash=generate_password_hash(password)
-        )
-        db.session.add(user)
-        db.session.commit()
-        
-        login_user(user)
-        return jsonify({'success': True, 'redirect': url_for('dashboard')})
+        try:
+            user = User(
+                email=email,
+                name=name,
+                password_hash=generate_password_hash(password)
+            )
+            db.session.add(user)
+            db.session.commit()
+            
+            login_user(user)
+            flash('Регистрация успешна! Добро пожаловать!', 'success')
+            return redirect(url_for('dashboard'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash('Ошибка при регистрации. Попробуйте еще раз.', 'error')
+            return render_template('register.html')
     
     return render_template('register.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        data = request.get_json()
-        email = data.get('email')
-        password = data.get('password')
+        # Get form data instead of JSON
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        if not email or not password:
+            flash('Введите email и пароль', 'error')
+            return render_template('login.html')
         
         user = User.query.filter_by(email=email).first()
         if user and check_password_hash(user.password_hash, password):
             login_user(user)
-            return jsonify({'success': True, 'redirect': url_for('dashboard')})
+            flash('Вход выполнен успешно!', 'success')
+            return redirect(url_for('dashboard'))
         
-        return jsonify({'error': 'Invalid credentials'}), 401
+        flash('Неверный email или пароль', 'error')
+        return render_template('login.html')
     
     return render_template('login.html')
 
