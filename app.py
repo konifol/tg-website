@@ -647,4 +647,4 @@ if __name__ == '__main__':
             print(f"Error creating database tables: {e}")
             print("Please check your MariaDB connection and credentials.")
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5001)

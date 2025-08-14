@@ -18,7 +18,6 @@
 - **Frontend**: HTML5, CSS3, JavaScript, Bootstrap 5, jQuery
 - **База данных**: MariaDB/MySQL
 - **Аутентификация**: Flask-Login с поддержкой Google OAuth
-- **Контейнеризация**: Docker & Docker Compose
 - **Администрирование**: Встроенная панель управления
 
 ## 📋 Требования
@@ -26,20 +25,17 @@
 - Python 3.7+
 - MariaDB 10.5+ или MySQL 8.0+
 - pip
-- Docker & Docker Compose (опционально)
 - Веб-браузер
 
 ## 🚀 Установка и запуск
 
-### Способ 1: Локальная установка
-
-#### 1. Клонирование репозитория
+### 1. Клонирование репозитория
 ```bash
 git clone <repository-url>
 cd bot-creator-platform
 ```
 
-#### 2. Создание виртуального окружения
+### 2. Создание виртуального окружения
 ```bash
 python -m venv venv
 source venv/bin/activate  # Linux/Mac
@@ -47,26 +43,27 @@ source venv/bin/activate  # Linux/Mac
 venv\Scripts\activate  # Windows
 ```
 
-#### 3. Установка зависимостей
+### 3. Установка зависимостей
 ```bash
 pip install -r requirements.txt
 ```
 
-#### 4. Настройка MariaDB
+### 4. Настройка MariaDB
 ```bash
 # Установка MariaDB (Ubuntu/Debian)
 sudo apt update
 sudo apt install -y mariadb-server mariadb-client
 
 # Запуск сервиса
-sudo systemctl start mariadb
-sudo systemctl enable mariadb
+sudo service mariadb start
 
-# Безопасная установка
-sudo mysql_secure_installation
+# Создание базы и пользователя
+sudo mysql -e "CREATE DATABASE IF NOT EXISTS botcreator CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+sudo mysql -e "CREATE USER IF NOT EXISTS 'botcreator'@'localhost' IDENTIFIED BY 'botcreator123';"
+sudo mysql -e "GRANT ALL PRIVILEGES ON botcreator.* TO 'botcreator'@'localhost'; FLUSH PRIVILEGES;"
 ```
 
-#### 5. Создание базы данных
+### 5. Создание таблиц
 ```bash
 # Автоматическая настройка
 chmod +x database/setup_database.sh
@@ -76,7 +73,7 @@ chmod +x database/setup_database.sh
 python3 database/manage_db.py create
 ```
 
-#### 6. Настройка переменных окружения
+### 6. Настройка переменных окружения
 Создайте файл `.env` на основе `.env.example`:
 ```env
 SECRET_KEY=your-secret-key-here
@@ -89,43 +86,30 @@ GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 ```
 
-#### 7. Запуск приложения
+### 7. Запуск приложения
 ```bash
 python3 app.py
 ```
 
-### Способ 2: Docker Compose (рекомендуется)
+Приложение будет доступно по адресу: **http://localhost:5001**
 
-#### 1. Клонирование и настройка
+## 🧪 Тестирование
+
+### Проверка подключения к базе
 ```bash
-git clone <repository-url>
-cd bot-creator-platform
-
-# Создание .env файла
-cp .env.example .env
-# Отредактируйте .env файл
+python3 test_simple.py
 ```
 
-#### 2. Запуск с Docker Compose
+### Тест Flask приложения
 ```bash
-# Запуск всех сервисов
-docker-compose up -d
-
-# Просмотр логов
-docker-compose logs -f
-
-# Остановка
-docker-compose down
+python3 test_app.py
 ```
 
-#### 3. Только база данных
-```bash
-# Запуск только MariaDB
-docker-compose up -d mariadb
-
-# Подключение к базе
-docker-compose exec mariadb mysql -u botcreator -p botcreator
-```
+### Проверка работы веб-интерфейса
+1. Откройте браузер
+2. Перейдите по адресу: http://localhost:5001
+3. Проверьте главную страницу
+4. Попробуйте войти в админ-панель
 
 ## 🔐 Доступ к админ-панели
 
@@ -189,7 +173,7 @@ VALUES ('admin@example.com', 'Admin', 'hashed_password', NOW(), NOW(), TRUE);
 3. Включите Google+ API
 4. Создайте OAuth 2.0 credentials
 5. Добавьте разрешенные redirect URIs:
-   - http://localhost:5000/google-callback (для разработки)
+   - http://localhost:5001/google-callback (для разработки)
    - https://yourdomain.com/google-callback (для продакшена)
 6. Скопируйте Client ID и Client Secret в `.env` файл
 
@@ -299,26 +283,16 @@ DB_PASSWORD=secure-password
 DB_NAME=botcreator
 ```
 
-### 4. Docker Compose для продакшена
-```bash
-# Запуск с Nginx
-docker-compose --profile production up -d
-
-# Мониторинг
-docker-compose ps
-docker-compose logs -f
-```
-
 ## 🐛 Устранение неполадок
 
 ### Проблема: Не удается подключиться к MariaDB
 **Решение**: 
 ```bash
 # Проверка статуса сервиса
-sudo systemctl status mariadb
+sudo service mariadb status
 
 # Перезапуск сервиса
-sudo systemctl restart mariadb
+sudo service mariadb restart
 
 # Проверка подключения
 mysql -u botcreator -p -h localhost
@@ -354,6 +328,13 @@ python3 database/manage_db.py show --table users
 python3 database/manage_db.py admin --email newadmin@example.com --name NewAdmin --password secret123
 ```
 
+### Проблема: Порт 5000 занят
+**Решение**:
+```bash
+# Приложение автоматически запускается на порту 5001
+# Или измените порт в app.py
+```
+
 ## 📊 Мониторинг и резервное копирование
 
 ### Автоматическое резервное копирование
@@ -362,16 +343,16 @@ python3 database/manage_db.py admin --email newadmin@example.com --name NewAdmin
 0 2 * * * /path/to/project/database/manage_db.py backup --backup-file /backups/backup_$(date +\%Y\%m\%d).sql
 ```
 
-### Мониторинг через Docker
+### Мониторинг
 ```bash
-# Статус контейнеров
-docker-compose ps
+# Проверка состояния базы
+python3 database/manage_db.py show
 
 # Логи приложения
-docker-compose logs -f app
+tail -f app.log
 
-# Логи базы данных
-docker-compose logs -f mariadb
+# Проверка процессов
+ps aux | grep "python3 app.py"
 ```
 
 ## 🤝 Вклад в проект
