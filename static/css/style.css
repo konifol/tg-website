@@ -1,0 +1,262 @@
+/* Custom styles for Bot Creator Platform */
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+}
+
+.navbar-brand {
+    font-weight: 700;
+    font-size: 1.5rem;
+}
+
+.min-vh-75 {
+    min-height: 75vh;
+}
+
+.card {
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.btn {
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+}
+
+.btn-lg {
+    padding: 12px 24px;
+    font-size: 1.1rem;
+}
+
+/* Bot Builder specific styles */
+.bot-builder {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 20px rgba(0,0,0,0.08);
+    margin: 20px 0;
+    overflow: hidden;
+}
+
+.block-palette {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+.block-item {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+
+.block-item:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+}
+
+.workspace {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
+    border: 2px dashed #dee2e6;
+    transition: all 0.3s ease;
+}
+
+.workspace.drag-over {
+    border-color: #007bff;
+    background: linear-gradient(135deg, #f0f8ff 0%, #e6f3ff 100%);
+    transform: scale(1.02);
+}
+
+.block {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    border-left: 4px solid;
+}
+
+.block:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+}
+
+.block-remove {
+    transition: all 0.2s ease;
+}
+
+.block-remove:hover {
+    transform: scale(1.1);
+}
+
+.preview-panel {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+.code-preview {
+    background: #1a202c;
+    border: 1px solid #2d3748;
+    font-family: 'Fira Code', 'Courier New', monospace;
+    line-height: 1.6;
+}
+
+.code-preview pre {
+    margin: 0;
+    white-space: pre-wrap;
+}
+
+.code-preview code {
+    color: #e2e8f0;
+}
+
+/* Block type colors */
+.block-type-welcome {
+    border-left-color: #28a745;
+    border-color: #28a745;
+}
+
+.block-type-help {
+    border-left-color: #17a2b8;
+    border-color: #17a2b8;
+}
+
+.block-type-about {
+    border-left-color: #6f42c1;
+    border-color: #6f42c1;
+}
+
+.block-type-response {
+    border-left-color: #fd7e14;
+    border-color: #fd7e14;
+}
+
+.block-type-echo {
+    border-left-color: #20c997;
+    border-color: #20c997;
+}
+
+/* Form improvements */
+.form-control {
+    border-radius: 8px;
+    border: 2px solid #e9ecef;
+    transition: all 0.2s ease;
+}
+
+.form-control:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.25);
+}
+
+.form-label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 8px;
+}
+
+/* Modal improvements */
+.modal-content {
+    border-radius: 12px;
+    border: none;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+}
+
+.modal-header {
+    border-bottom: 1px solid #e9ecef;
+    border-radius: 12px 12px 0 0;
+}
+
+.modal-footer {
+    border-top: 1px solid #e9ecef;
+    border-radius: 0 0 12px 12px;
+}
+
+/* Save indicator */
+.save-indicator {
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    animation: slideInRight 0.3s ease;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+    .bot-builder {
+        margin: 10px 0;
+    }
+    
+    .block-palette,
+    .preview-panel {
+        margin-bottom: 20px;
+    }
+    
+    .workspace {
+        min-height: 400px;
+    }
+}
+
+/* Loading states */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn.loading {
+    position: relative;
+    color: transparent;
+}
+
+.btn.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 16px;
+    height: 16px;
+    margin: -8px 0 0 -8px;
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
