@@ -4,9 +4,10 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import requests
 from dotenv import load_dotenv
+from functools import wraps
 
 # Load environment variables
 load_dotenv()
@@ -51,12 +52,23 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
+    is_admin = db.Column(db.Boolean, default=False, nullable=False)
     
     # Relationships
     bots = db.relationship('Bot', backref='user', lazy=True, cascade='all, delete-orphan')
     
     def __repr__(self):
         return f'<User {self.email}>'
+    
+    @property
+    def bot_count(self):
+        return len([bot for bot in self.bots if bot.is_active])
+    
+    @property
+    def last_activity(self):
+        if self.bots:
+            return max(bot.updated_at for bot in self.bots if bot.is_active)
+        return self.created_at
 
 class Bot(db.Model):
     __tablename__ = 'bots'
@@ -88,6 +100,18 @@ class BotSession(db.Model):
     
     def __repr__(self):
         return f'<BotSession {self.id} for user {self.user_id}>'
+
+# Admin decorator
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return redirect(url_for('login'))
+        if not current_user.is_admin:
+            flash('Доступ запрещен. Требуются права администратора.', 'error')
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -176,6 +200,149 @@ def dashboard():
 @login_required
 def create_bot():
     return render_template('create_bot.html')
+
+# Admin routes
+@app.route('/admin')
+@login_required
+@admin_required
+def admin_dashboard():
+    # Get statistics
+    total_users = User.query.filter_by(is_active=True).count()
+    total_bots = Bot.query.filter_by(is_active=True).count()
+    total_sessions = BotSession.query.count()
+    admin_count = User.query.filter_by(is_active=True, is_admin=True).count()
+    
+    # Recent registrations
+    recent_users = User.query.filter_by(is_active=True).order_by(User.created_at.desc()).limit(5).all()
+    
+    # Recent bots
+    recent_bots = Bot.query.filter_by(is_active=True).order_by(Bot.created_at.desc()).limit(5).all()
+    
+    return render_template('admin/dashboard.html', 
+                         total_users=total_users,
+                         total_bots=total_bots,
+                         total_sessions=total_sessions,
+                         admin_count=admin_count,
+                         recent_users=recent_users,
+                         recent_bots=recent_bots)
+
+@app.route('/admin/users')
+@login_required
+@admin_required
+def admin_users():
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
+    
+    users = User.query.paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    return render_template('admin/users.html', users=users)
+
+@app.route('/admin/users/<int:user_id>')
+@login_required
+@admin_required
+def admin_user_detail(user_id):
+    user = User.query.get_or_404(user_id)
+    user_bots = Bot.query.filter_by(user_id=user_id, is_active=True).order_by(Bot.created_at.desc()).all()
+    return render_template('admin/user_detail.html', user=user, bots=user_bots)
+
+@app.route('/admin/bots')
+@login_required
+@admin_required
+def admin_bots():
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
+    
+    bots = Bot.query.paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    
+    return render_template('admin/bots.html', bots=bots)
+
+@app.route('/admin/stats')
+@login_required
+@admin_required
+def admin_stats():
+    # Get statistics
+    total_users = User.query.filter_by(is_active=True).count()
+    total_bots = Bot.query.filter_by(is_active=True).count()
+    total_sessions = BotSession.query.count()
+    
+    # Recent registrations
+    recent_users = User.query.filter_by(is_active=True).order_by(User.created_at.desc()).limit(10).all()
+    
+    # Top users by bot count
+    top_users = db.session.query(
+        User.name,
+        User.email,
+        db.func.count(Bot.id).label('bot_count')
+    ).outerjoin(Bot, (User.id == Bot.user_id) & (Bot.is_active == True)).group_by(User.id).order_by(db.func.count(Bot.id).desc()).limit(10).all()
+    
+    # Monthly registrations
+    monthly_stats = db.session.query(
+        db.func.date_format(User.created_at, '%Y-%m').label('month'),
+        db.func.count(User.id).label('count')
+    ).filter(User.created_at >= datetime.utcnow().replace(day=1) - timedelta(days=365)).group_by(db.func.date_format(User.created_at, '%Y-%m')).order_by('month').all()
+    
+    return render_template('admin/stats.html', 
+                         total_users=total_users,
+                         total_bots=total_bots,
+                         total_sessions=total_sessions,
+                         recent_users=recent_users,
+                         top_users=top_users,
+                         monthly_stats=monthly_stats)
+
+@app.route('/api/admin/toggle-user-status/<int:user_id>', methods=['POST'])
+@login_required
+@admin_required
+def admin_toggle_user_status(user_id):
+    user = User.query.get_or_404(user_id)
+    
+    if user.is_admin and user.id == current_user.id:
+        return jsonify({'error': 'Нельзя деактивировать свой аккаунт администратора'}), 400
+    
+    user.is_active = not user.is_active
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'is_active': user.is_active,
+        'message': f'Пользователь {"активирован" if user.is_active else "деактивирован"}'
+    })
+
+@app.route('/api/admin/toggle-admin-status/<int:user_id>', methods=['POST'])
+@login_required
+@admin_required
+def admin_toggle_admin_status(user_id):
+    user = User.query.get_or_404(user_id)
+    
+    if user.id == current_user.id:
+        return jsonify({'error': 'Нельзя изменить права администратора для своего аккаунта'}), 400
+    
+    user.is_admin = not user.is_admin
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'is_admin': user.is_admin,
+        'message': f'Права администратора {"предоставлены" if user.is_admin else "отозваны"}'
+    })
+
+@app.route('/api/admin/delete-user/<int:user_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def admin_delete_user(user_id):
+    user = User.query.get_or_404(user_id)
+    
+    if user.is_admin and user.id == current_user.id:
+        return jsonify({'error': 'Нельзя удалить свой аккаунт администратора'}), 400
+    
+    # Soft delete - mark as inactive
+    user.is_active = False
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': 'Пользователь удален'})
 
 @app.route('/api/save-bot-session', methods=['POST'])
 @login_required
@@ -419,6 +586,20 @@ if __name__ == "__main__":
 def init_db():
     """Initialize the database with all tables."""
     db.create_all()
+    
+    # Create default admin user if not exists
+    admin_user = User.query.filter_by(email='admin').first()
+    if not admin_user:
+        admin_user = User(
+            email='admin',
+            name='Administrator',
+            password_hash=generate_password_hash('password'),
+            is_admin=True
+        )
+        db.session.add(admin_user)
+        db.session.commit()
+        print("Default admin user created: admin / password")
+    
     print("Database initialized successfully!")
 
 @app.cli.command('create-admin')
@@ -435,7 +616,8 @@ def create_admin():
     admin = User(
         email=email,
         name=name,
-        password_hash=generate_password_hash(password)
+        password_hash=generate_password_hash(password),
+        is_admin=True
     )
     
     db.session.add(admin)
@@ -446,6 +628,20 @@ if __name__ == '__main__':
     with app.app_context():
         try:
             db.create_all()
+            
+            # Create default admin user if not exists
+            admin_user = User.query.filter_by(email='admin').first()
+            if not admin_user:
+                admin_user = User(
+                    email='admin',
+                    name='Administrator',
+                    password_hash=generate_password_hash('password'),
+                    is_admin=True
+                )
+                db.session.add(admin_user)
+                db.session.commit()
+                print("Default admin user created: admin / password")
+            
             print("Database tables created successfully!")
         except Exception as e:
             print(f"Error creating database tables: {e}")

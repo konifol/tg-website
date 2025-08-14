@@ -38,6 +38,27 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('create_bot') }}">Создать бота</a>
                     </li>
+                    {% if current_user.is_admin %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-shield-alt me-1"></i>Админ
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('admin_dashboard') }}">
+                                <i class="fas fa-tachometer-alt me-2"></i>Панель управления
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_users') }}">
+                                <i class="fas fa-users me-2"></i>Пользователи
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_bots') }}">
+                                <i class="fas fa-robot me-2"></i>Боты
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_stats') }}">
+                                <i class="fas fa-chart-bar me-2"></i>Статистика
+                            </a></li>
+                        </ul>
+                    </li>
+                    {% endif %}
                     {% endif %}
                 </ul>
                 
@@ -46,6 +67,9 @@
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-user me-1"></i>{{ current_user.name }}
+                            {% if current_user.is_admin %}
+                            <span class="badge bg-warning text-dark ms-1">Admin</span>
+                            {% endif %}
                         </a>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="{{ url_for('dashboard') }}">Профиль</a></li>
@@ -68,10 +92,10 @@
 
     <!-- Main Content -->
     <main class="container my-4">
-        {% with messages = get_flashed_messages() %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
-                {% for message in messages %}
-                    <div class="alert alert-info alert-dismissible fade show" role="alert">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
                         {{ message }}
                         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                     </div>
