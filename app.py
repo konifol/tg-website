@@ -6,11 +6,30 @@ import os
 import json
 from datetime import datetime
 import requests
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-here')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///bot_creator.db'
+
+# MariaDB Configuration
+DB_HOST = os.environ.get('DB_HOST', 'localhost')
+DB_PORT = os.environ.get('DB_PORT', '3306')
+DB_USER = os.environ.get('DB_USER', 'botcreator')
+DB_PASSWORD = os.environ.get('DB_PASSWORD', 'botcreator123')
+DB_NAME = os.environ.get('DB_NAME', 'botcreator')
+
+# MariaDB connection string
+app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}?charset=utf8mb4'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_recycle': 3600,
+    'pool_pre_ping': True,
+    'pool_size': 10,
+    'max_overflow': 20
+}
 
 db = SQLAlchemy(app)
 login_manager = LoginManager()
@@ -22,22 +41,53 @@ GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', 'your-google-client-id')
 GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', 'your-google-client-secret')
 
 class User(UserMixin, db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(120), unique=True, nullable=False)
+    __tablename__ = 'users'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     name = db.Column(db.String(120), nullable=False)
-    google_id = db.Column(db.String(120), unique=True, nullable=True)
+    google_id = db.Column(db.String(120), unique=True, nullable=True, index=True)
     password_hash = db.Column(db.String(200), nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    bots = db.relationship('Bot', backref='user', lazy=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    
+    # Relationships
+    bots = db.relationship('Bot', backref='user', lazy=True, cascade='all, delete-orphan')
+    
+    def __repr__(self):
+        return f'<User {self.email}>'
 
 class Bot(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), nullable=False)
+    __tablename__ = 'bots'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(120), nullable=False, index=True)
     token = db.Column(db.String(200), nullable=True)
     config = db.Column(db.Text, nullable=False)  # JSON string
     python_code = db.Column(db.Text, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    
+    def __repr__(self):
+        return f'<Bot {self.name}>'
+
+class BotSession(db.Model):
+    __tablename__ = 'bot_sessions'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    session_data = db.Column(db.Text, nullable=False)  # JSON string
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    user = db.relationship('User', backref='bot_sessions')
+    
+    def __repr__(self):
+        return f'<BotSession {self.id} for user {self.user_id}>'
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -119,7 +169,7 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    user_bots = Bot.query.filter_by(user_id=current_user.id).all()
+    user_bots = Bot.query.filter_by(user_id=current_user.id, is_active=True).order_by(Bot.created_at.desc()).all()
     return render_template('dashboard.html', bots=user_bots)
 
 @app.route('/create-bot')
@@ -131,13 +181,30 @@ def create_bot():
 @login_required
 def save_bot_session():
     data = request.get_json()
-    session['bot_config'] = data
+    
+    # Save to database instead of session
+    existing_session = BotSession.query.filter_by(user_id=current_user.id).first()
+    
+    if existing_session:
+        existing_session.session_data = json.dumps(data)
+        existing_session.updated_at = datetime.utcnow()
+    else:
+        new_session = BotSession(
+            user_id=current_user.id,
+            session_data=json.dumps(data)
+        )
+        db.session.add(new_session)
+    
+    db.session.commit()
     return jsonify({'success': True})
 
 @app.route('/api/get-bot-session')
 @login_required
 def get_bot_session():
-    return jsonify(session.get('bot_config', {}))
+    session_record = BotSession.query.filter_by(user_id=current_user.id).first()
+    if session_record:
+        return jsonify(json.loads(session_record.session_data))
+    return jsonify({})
 
 @app.route('/api/save-bot', methods=['POST'])
 @login_required
@@ -155,8 +222,11 @@ def save_bot():
     db.session.add(bot)
     db.session.commit()
     
-    # Clear session
-    session.pop('bot_config', None)
+    # Clear session data
+    session_record = BotSession.query.filter_by(user_id=current_user.id).first()
+    if session_record:
+        db.session.delete(session_record)
+        db.session.commit()
     
     return jsonify({'success': True, 'bot_id': bot.id})
 
@@ -171,12 +241,46 @@ def generate_python_code():
     
     return jsonify({'python_code': python_code})
 
+@app.route('/api/delete-bot/<int:bot_id>', methods=['DELETE'])
+@login_required
+def delete_bot(bot_id):
+    bot = Bot.query.filter_by(id=bot_id, user_id=current_user.id).first()
+    if not bot:
+        return jsonify({'error': 'Bot not found'}), 404
+    
+    # Soft delete
+    bot.is_active = False
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
+@app.route('/api/download-bot/<int:bot_id>')
+@login_required
+def download_bot(bot_id):
+    bot = Bot.query.filter_by(id=bot_id, user_id=current_user.id).first()
+    if not bot:
+        return jsonify({'error': 'Bot not found'}), 404
+    
+    return jsonify({
+        'name': bot.name,
+        'python_code': bot.python_code,
+        'config': json.loads(bot.config)
+    })
+
 def generate_bot_code(config):
     """Generate Python code for the Telegram bot based on configuration"""
     
     code = '''import telebot
 from telebot import types
 import os
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Bot token - replace with your actual token
 TOKEN = 'YOUR_BOT_TOKEN_HERE'
@@ -186,6 +290,16 @@ bot = telebot.TeleBot(TOKEN)
 BOT_NAME = "{}"
 BOT_DESCRIPTION = "{}"
 
+# Error handler
+@bot.message_handler(func=lambda message: True)
+def echo_all(message):
+    try:
+        # This will be overridden by specific handlers
+        pass
+    except Exception as e:
+        logger.error(f"Error processing message: {e}")
+        bot.reply_to(message, "Sorry, something went wrong. Please try again later.")
+
 '''
     
     # Add handlers based on configuration
@@ -194,15 +308,20 @@ BOT_DESCRIPTION = "{}"
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     """Handle /start command"""
-    welcome_text = """{}
-    
+    try:
+        welcome_text = """{}
+        
 Welcome to {}! I'm here to help you.
-    """.format(BOT_DESCRIPTION, BOT_NAME)
-    
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add(types.KeyboardButton("Help"), types.KeyboardButton("About"))
-    
-    bot.reply_to(message, welcome_text, reply_markup=markup)
+        """.format(BOT_DESCRIPTION, BOT_NAME)
+        
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        markup.add(types.KeyboardButton("Help"), types.KeyboardButton("About"))
+        
+        bot.reply_to(message, welcome_text, reply_markup=markup)
+        logger.info(f"User {message.from_user.id} started the bot")
+    except Exception as e:
+        logger.error(f"Error in welcome handler: {e}")
+        bot.reply_to(message, "Welcome! I'm here to help you.")
 '''
     
     if config.get('help_command'):
@@ -210,12 +329,17 @@ Welcome to {}! I'm here to help you.
 @bot.message_handler(commands=['help'])
 def send_help(message):
     """Handle /help command"""
-    help_text = """Available commands:
+    try:
+        help_text = """Available commands:
 /start - Start the bot
 /help - Show this help message
 /about - About the bot
-    """
-    bot.reply_to(message, help_text)
+        """
+        bot.reply_to(message, help_text)
+        logger.info(f"User {message.from_user.id} requested help")
+    except Exception as e:
+        logger.error(f"Error in help handler: {e}")
+        bot.reply_to(message, "Here's how to use me...")
 '''
     
     if config.get('about_command'):
@@ -223,16 +347,21 @@ def send_help(message):
 @bot.message_handler(commands=['about'])
 def send_about(message):
     """Handle /about command"""
-    about_text = """{}
-    
+    try:
+        about_text = """{}
+        
 This bot was created using Bot Creator Platform.
-    """.format(BOT_DESCRIPTION)
-    bot.reply_to(message, about_text)
+        """.format(BOT_DESCRIPTION)
+        bot.reply_to(message, about_text)
+        logger.info(f"User {message.from_user.id} requested about info")
+    except Exception as e:
+        logger.error(f"Error in about handler: {e}")
+        bot.reply_to(message, "I'm a helpful bot created with Bot Creator Platform.")
 '''
     
     # Add custom responses
     if config.get('custom_responses'):
-        for response in config['custom_responses']:
+        for i, response in enumerate(config['custom_responses']):
             trigger = response.get('trigger', '')
             reply = response.get('reply', '')
             if trigger and reply:
@@ -240,8 +369,13 @@ This bot was created using Bot Creator Platform.
 @bot.message_handler(func=lambda message: "{}" in message.text.lower())
 def custom_response_{}(message):
     """Custom response to: {}"""
-    bot.reply_to(message, "{}")
-'''.format(trigger, trigger.replace(' ', '_'), trigger, reply)
+    try:
+        bot.reply_to(message, "{}")
+        logger.info(f"User {message.from_user.id} triggered custom response: {}")
+    except Exception as e:
+        logger.error(f"Error in custom response handler: {e}")
+        bot.reply_to(message, "{}")
+'''.format(trigger, i, trigger, reply, trigger, reply)
     
     # Add echo functionality if enabled
     if config.get('echo_enabled'):
@@ -249,18 +383,29 @@ def custom_response_{}(message):
 @bot.message_handler(func=lambda message: True)
 def echo_all(message):
     """Echo all messages"""
-    bot.reply_to(message, message.text)
+    try:
+        bot.reply_to(message, message.text)
+        logger.info(f"User {message.from_user.id} sent: {message.text}")
+    except Exception as e:
+        logger.error(f"Error in echo handler: {e}")
+        bot.reply_to(message, "Sorry, I couldn't process your message.")
 '''
     
     # Add main execution
     code += '''
 if __name__ == "__main__":
+    logger.info(f"Starting {BOT_NAME}...")
     print(f"Starting {BOT_NAME}...")
     print("Bot is running. Press Ctrl+C to stop.")
+    
     try:
-        bot.polling(none_stop=True)
+        bot.polling(none_stop=True, timeout=60)
     except KeyboardInterrupt:
+        logger.info("Bot stopped by user")
         print("Bot stopped.")
+    except Exception as e:
+        logger.error(f"Bot stopped due to error: {e}")
+        print(f"Bot stopped due to error: {e}")
 '''
     
     return code.format(
@@ -270,7 +415,40 @@ if __name__ == "__main__":
         config.get('name', 'My Bot')
     )
 
+@app.cli.command('init-db')
+def init_db():
+    """Initialize the database with all tables."""
+    db.create_all()
+    print("Database initialized successfully!")
+
+@app.cli.command('create-admin')
+def create_admin():
+    """Create an admin user."""
+    email = input("Enter admin email: ")
+    name = input("Enter admin name: ")
+    password = input("Enter admin password: ")
+    
+    if User.query.filter_by(email=email).first():
+        print("User already exists!")
+        return
+    
+    admin = User(
+        email=email,
+        name=name,
+        password_hash=generate_password_hash(password)
+    )
+    
+    db.session.add(admin)
+    db.session.commit()
+    print(f"Admin user {email} created successfully!")
+
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()
-    app.run(debug=True)
+        try:
+            db.create_all()
+            print("Database tables created successfully!")
+        except Exception as e:
+            print(f"Error creating database tables: {e}")
+            print("Please check your MariaDB connection and credentials.")
+    
+    app.run(debug=True, host='0.0.0.0', port=5000)
