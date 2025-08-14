@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}Bot Creator Platform - Создавайте Telegram ботов без программирования{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <!-- Hero Section -->
+    <div class="row align-items-center">
+        <div class="col-lg-6">
+            <h1 class="display-4 fw-bold text-primary mb-4">
+                Создавайте умных Telegram ботов
+                <span class="text-success">без программирования</span>
+            </h1>
+            <p class="lead mb-4">
+                Интуитивный блочный интерфейс для создания мощных Telegram ботов. 
+                Перетаскивайте блоки, настраивайте параметры и получайте готовый Python код!
+            </p>
+            <div class="d-grid gap-2 d-md-flex justify-content-md-start">
+                {% if current_user.is_authenticated %}
+                    <a href="{{ url_for('create_bot') }}" class="btn btn-primary btn-lg px-4 me-md-2">
+                        <i class="fas fa-plus-circle me-2"></i>Создать бота
+                    </a>
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary btn-lg px-4">
+                        <i class="fas fa-tachometer-alt me-2"></i>Мой кабинет
+                    </a>
+                {% else %}
+                    <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg px-4 me-md-2">
+                        <i class="fas fa-user-plus me-2"></i>Начать бесплатно
+                    </a>
+                    <a href="{{ url_for('login') }}" class="btn btn-outline-secondary btn-lg px-4">
+                        <i class="fas fa-sign-in-alt me-2"></i>Войти
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-lg-6 text-center">
+            <img src="{{ url_for('static', filename='img/bot-creation.svg') }}" 
+                 alt="Bot Creation" 
+                 class="img-fluid"
+                 style="max-width: 400px;">
+        </div>
+    </div>
+
+    <!-- Features Section -->
+    <div class="row mt-5 pt-5">
+        <div class="col-12 text-center mb-5">
+            <h2 class="display-5 fw-bold">Почему Bot Creator Platform?</h2>
+            <p class="lead text-muted">Простота, мощность и гибкость в одном решении</p>
+        </div>
+        
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center p-4">
+                    <div class="bg-primary bg-gradient text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px;">
+                        <i class="fas fa-puzzle-piece fa-2x"></i>
+                    </div>
+                    <h5 class="card-title">Блочный интерфейс</h5>
+                    <p class="card-text">
+                        Создавайте ботов, перетаскивая готовые блоки. Не нужно знать Python или другие языки программирования.
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center p-4">
+                    <div class="bg-success bg-gradient text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px;">
+                        <i class="fas fa-code fa-2x"></i>
+                    </div>
+                    <h5 class="card-title">Автогенерация кода</h5>
+                    <p class="card-text">
+                        Получайте готовый Python скрипт для вашего бота. Просто скопируйте и запустите!
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center p-4">
+                    <div class="bg-info bg-gradient text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px;">
+                        <i class="fas fa-save fa-2x"></i>
+                    </div>
+                    <h5 class="card-title">Сохранение сессий</h5>
+                    <p class="card-text">
+                        Ваша работа автоматически сохраняется. Возвращайтесь к созданию бота в любое время.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- How It Works Section -->
+    <div class="row mt-5 pt-5">
+        <div class="col-12 text-center mb-5">
+            <h2 class="display-5 fw-bold">Как это работает?</h2>
+            <p class="lead text-muted">Всего 3 простых шага до готового бота</p>
+        </div>
+        
+        <div class="col-md-4 text-center mb-4">
+            <div class="position-relative">
+                <div class="bg-primary bg-gradient text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 60px; height: 60px;">
+                    <span class="fw-bold fs-4">1</span>
+                </div>
+                <h5>Выберите блоки</h5>
+                <p class="text-muted">Перетащите нужные блоки в рабочую область</p>
+            </div>
+        </div>
+        
+        <div class="col-md-4 text-center mb-4">
+            <div class="position-relative">
+                <div class="bg-success bg-gradient text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 60px; height: 60px;">
+                    <span class="fw-bold fs-4">2</span>
+                </div>
+                <h5>Настройте параметры</h5>
+                <p class="text-muted">Укажите название, описание и настройки бота</p>
+            </div>
+        </div>
+        
+        <div class="col-md-4 text-center mb-4">
+            <div class="position-relative">
+                <div class="bg-info bg-gradient text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 60px; height: 60px;">
+                    <span class="fw-bold fs-4">3</span>
+                </div>
+                <h5>Получите код</h5>
+                <p class="text-muted">Скачайте готовый Python скрипт и запустите бота</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Available Blocks Section -->
+    <div class="row mt-5 pt-5">
+        <div class="col-12 text-center mb-5">
+            <h2 class="display-5 fw-bold">Доступные блоки</h2>
+            <p class="lead text-muted">Готовые компоненты для создания функциональных ботов</p>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center p-3">
+                    <i class="fas fa-hand-wave text-primary fa-2x mb-3"></i>
+                    <h6>Приветствие</h6>
+                    <small class="text-muted">Команда /start</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center p-3">
+                    <i class="fas fa-question-circle text-success fa-2x mb-3"></i>
+                    <h6>Помощь</h6>
+                    <small class="text-muted">Команда /help</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center p-3">
+                    <i class="fas fa-info-circle text-info fa-2x mb-3"></i>
+                    <h6>О боте</h6>
+                    <small class="text-muted">Команда /about</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-3 col-md-6 mb-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center p-3">
+                    <i class="fas fa-comments text-warning fa-2x mb-3"></i>
+                    <h6>Кастомный ответ</h6>
+                    <small class="text-muted">Ответ на ключевые слова</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CTA Section -->
+    <div class="row mt-5 pt-5">
+        <div class="col-12 text-center">
+            <div class="bg-primary bg-gradient text-white rounded-3 p-5">
+                <h2 class="display-5 fw-bold mb-4">Готовы создать своего первого бота?</h2>
+                <p class="lead mb-4">
+                    Присоединяйтесь к тысячам пользователей, которые уже создают умных ботов без программирования!
+                </p>
+                {% if current_user.is_authenticated %}
+                    <a href="{{ url_for('create_bot') }}" class="btn btn-light btn-lg px-4">
+                        <i class="fas fa-rocket me-2"></i>Создать бота сейчас
+                    </a>
+                {% else %}
+                    <a href="{{ url_for('register') }}" class="btn btn-light btn-lg px-4 me-3">
+                        <i class="fas fa-user-plus me-2"></i>Зарегистрироваться
+                    </a>
+                    <a href="{{ url_for('login') }}" class="btn btn-outline-light btn-lg px-4">
+                        <i class="fas fa-sign-in-alt me-2"></i>Войти
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
