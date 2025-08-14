@@ -1,0 +1,372 @@
+{% extends "base.html" %}
+
+{% block title %}Управление ботами - Админ-панель{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="h2 mb-0">
+                    <i class="fas fa-robot me-2 text-primary"></i>Управление ботами
+                </h1>
+                <p class="text-muted">Просмотр и управление всеми ботами на платформе</p>
+            </div>
+            <div>
+                <button class="btn btn-outline-primary" onclick="refreshBots()">
+                    <i class="fas fa-sync-alt me-2"></i>Обновить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Search and Filters -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <input type="text" class="form-control" id="searchBot" placeholder="Поиск по названию бота...">
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="statusFilter">
+                    <option value="">Все статусы</option>
+                    <option value="active">Активные</option>
+                    <option value="inactive">Неактивные</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="tokenFilter">
+                    <option value="">Все боты</option>
+                    <option value="with_token">С токенами</option>
+                    <option value="without_token">Без токенов</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-primary w-100" onclick="applyFilters()">
+                    <i class="fas fa-search me-2"></i>Найти
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bots Table -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-light">
+        <div class="row align-items-center">
+            <div class="col">
+                <h5 class="mb-0">Боты ({{ bots.total }})</h5>
+            </div>
+            <div class="col-auto">
+                <small class="text-muted">Страница {{ bots.page }} из {{ bots.pages }}</small>
+            </div>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Название</th>
+                        <th>Владелец</th>
+                        <th>Токен</th>
+                        <th>Статус</th>
+                        <th>Дата создания</th>
+                        <th>Последнее обновление</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for bot in bots.items %}
+                    <tr id="bot-row-{{ bot.id }}">
+                        <td>{{ bot.id }}</td>
+                        <td>
+                            <strong>{{ bot.name }}</strong>
+                            {% if bot.token %}
+                            <i class="fas fa-key text-success ms-1" title="Токен настроен"></i>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('admin_user_detail', user_id=bot.user.id) }}" class="text-decoration-none">
+                                {{ bot.user.name }}
+                            </a>
+                            <br>
+                            <small class="text-muted">{{ bot.user.email }}</small>
+                        </td>
+                        <td>
+                            {% if bot.token %}
+                            <code class="small">{{ bot.token[:20] }}...</code>
+                            <button class="btn btn-sm btn-outline-secondary ms-1" 
+                                    onclick="showFullToken('{{ bot.token }}')" 
+                                    title="Показать полный токен">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            {% else %}
+                            <span class="text-muted">Не настроен</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if bot.is_active %}
+                            <span class="badge bg-success">Активен</span>
+                            {% else %}
+                            <span class="badge bg-danger">Неактивен</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ bot.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                        <td>{{ bot.updated_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button class="btn btn-outline-primary" 
+                                        onclick="viewBotConfig({{ bot.id }})" 
+                                        title="Просмотр конфигурации">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                
+                                <button class="btn btn-outline-success" 
+                                        onclick="downloadBotCode({{ bot.id }})" 
+                                        title="Скачать код">
+                                    <i class="fas fa-download"></i>
+                                </button>
+                                
+                                <button class="btn btn-outline-warning" 
+                                        onclick="toggleBotStatus({{ bot.id }})" 
+                                        title="{{ 'Активировать' if not bot.is_active else 'Деактивировать' }}">
+                                    <i class="fas fa-{{ 'check' if not bot.is_active else 'ban' }}"></i>
+                                </button>
+                                
+                                <button class="btn btn-outline-info" 
+                                        onclick="viewBotDetails({{ bot.id }})" 
+                                        title="Детали">
+                                    <i class="fas fa-info-circle"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Pagination -->
+{% if bots.pages > 1 %}
+<nav aria-label="Bots pagination" class="mt-4">
+    <ul class="pagination justify-content-center">
+        {% if bots.has_prev %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('admin_bots', page=bots.prev_num) }}">Предыдущая</a>
+        </li>
+        {% endif %}
+        
+        {% for page_num in bots.iter_pages() %}
+            {% if page_num %}
+                {% if page_num != bots.page %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('admin_bots', page=page_num) }}">{{ page_num }}</a>
+                </li>
+                {% else %}
+                <li class="page-item active">
+                    <span class="page-link">{{ page_num }}</span>
+                </li>
+                {% endif %}
+            {% else %}
+            <li class="page-item disabled">
+                <span class="page-link">...</span>
+            </li>
+            {% endif %}
+        {% endfor %}
+        
+        {% if bots.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('admin_bots', page=bots.next_num) }}">Следующая</a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+<!-- Bot Config Modal -->
+<div class="modal fade" id="botConfigModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Конфигурация бота</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="botConfigContent">
+                    <!-- Content will be loaded here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bot Details Modal -->
+<div class="modal fade" id="botDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Детали бота</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="botDetailsContent">
+                    <!-- Content will be loaded here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Token Modal -->
+<div class="modal fade" id="tokenModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Полный токен бота</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Внимание!</strong> Токен бота является конфиденциальной информацией. Не делитесь им с посторонними.
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Токен:</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="fullToken" readonly>
+                        <button class="btn btn-outline-secondary" type="button" onclick="copyToken()">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function refreshBots() {
+    location.reload();
+}
+
+function applyFilters() {
+    const search = document.getElementById('searchBot').value;
+    const status = document.getElementById('statusFilter').value;
+    const token = document.getElementById('tokenFilter').value;
+    
+    // Здесь можно добавить AJAX фильтрацию
+    // Пока просто перезагружаем страницу
+    location.reload();
+}
+
+function viewBotConfig(botId) {
+    document.getElementById('botConfigContent').innerHTML = '<p class="text-center">Загрузка конфигурации...</p>';
+    $('#botConfigModal').modal('show');
+    
+    // Показываем заглушку
+    setTimeout(() => {
+        document.getElementById('botConfigContent').innerHTML = `
+            <div class="text-center py-4">
+                <i class="fas fa-cog fa-2x text-muted mb-3"></i>
+                <h5 class="text-muted">Конфигурация бота</h5>
+                <p class="text-muted">Функция просмотра конфигурации будет добавлена позже</p>
+            </div>
+        `;
+    }, 1000);
+}
+
+function downloadBotCode(botId) {
+    // Здесь будет скачивание кода бота
+    showAlert('info', 'Функция скачивания кода будет добавлена позже');
+}
+
+function toggleBotStatus(botId) {
+    // Здесь будет изменение статуса бота
+    showAlert('info', 'Функция изменения статуса бота будет добавлена позже');
+}
+
+function viewBotDetails(botId) {
+    document.getElementById('botDetailsContent').innerHTML = '<p class="text-center">Загрузка деталей...</p>';
+    $('#botDetailsModal').modal('show');
+    
+    // Показываем заглушку
+    setTimeout(() => {
+        document.getElementById('botDetailsContent').innerHTML = `
+            <div class="text-center py-4">
+                <i class="fas fa-info-circle fa-2x text-muted mb-3"></i>
+                <h5 class="text-muted">Детали бота</h5>
+                <p class="text-muted">Функция просмотра деталей будет добавлена позже</p>
+            </div>
+        `;
+    }, 1000);
+}
+
+function showFullToken(token) {
+    document.getElementById('fullToken').value = token;
+    $('#tokenModal').modal('show');
+}
+
+function copyToken() {
+    const tokenInput = document.getElementById('fullToken');
+    tokenInput.select();
+    tokenInput.setSelectionRange(0, 99999); // For mobile devices
+    
+    try {
+        document.execCommand('copy');
+        showAlert('success', 'Токен скопирован в буфер обмена');
+    } catch (err) {
+        showAlert('error', 'Не удалось скопировать токен');
+    }
+}
+
+function showAlert(type, message) {
+    const alertClass = type === 'error' ? 'danger' : type;
+    const alertHtml = `
+        <div class="alert alert-${alertClass} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    // Insert at the top of the content
+    const content = document.querySelector('main');
+    content.insertAdjacentHTML('afterbegin', alertHtml);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        const alert = document.querySelector('.alert');
+        if (alert) {
+            alert.remove();
+        }
+    }, 5000);
+}
+
+// Search functionality
+document.getElementById('searchBot').addEventListener('keyup', function(e) {
+    if (e.key === 'Enter') {
+        applyFilters();
+    }
+});
+
+// Auto-refresh every 2 minutes
+setInterval(function() {
+    // Можно добавить AJAX обновление списка ботов
+}, 120000);
+</script>
+{% endblock %}

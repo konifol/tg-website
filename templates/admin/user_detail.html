@@ -1,0 +1,399 @@
+{% extends "base.html" %}
+
+{% block title %}Пользователь {{ user.name }} - Админ-панель{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="h2 mb-0">
+                    <i class="fas fa-user me-2 text-primary"></i>{{ user.name }}
+                </h1>
+                <p class="text-muted">Детальная информация о пользователе</p>
+            </div>
+            <div>
+                <a href="{{ url_for('admin_users') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Назад к списку
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- User Information -->
+<div class="row g-4 mb-5">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle me-2 text-primary"></i>Основная информация
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-4 fw-bold">ID:</div>
+                    <div class="col-8">{{ user.id }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-4 fw-bold">Имя:</div>
+                    <div class="col-8">{{ user.name }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-4 fw-bold">Email:</div>
+                    <div class="col-8">
+                        {{ user.email }}
+                        {% if user.google_id %}
+                        <i class="fas fa-google text-success ms-2" title="Google аккаунт"></i>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-4 fw-bold">Google ID:</div>
+                    <div class="col-8">
+                        {% if user.google_id %}
+                        {{ user.google_id }}
+                        {% else %}
+                        <span class="text-muted">Не подключен</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-4 fw-bold">Статус:</div>
+                    <div class="col-8">
+                        {% if user.is_active %}
+                        <span class="badge bg-success">Активен</span>
+                        {% else %}
+                        <span class="badge bg-danger">Неактивен</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-4 fw-bold">Роль:</div>
+                    <div class="col-8">
+                        {% if user.is_admin %}
+                        <span class="badge bg-warning text-dark">Администратор</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Пользователь</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">
+                    <i class="fas fa-clock me-2 text-primary"></i>Активность
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-4 fw-bold">Регистрация:</div>
+                    <div class="col-8">{{ user.created_at.strftime('%d.%m.%Y %H:%M:%S') }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-4 fw-bold">Обновление:</div>
+                    <div class="col-8">{{ user.updated_at.strftime('%d.%m.%Y %H:%M:%S') }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-4 fw-bold">Последняя активность:</div>
+                    <div class="col-8">{{ user.last_activity.strftime('%d.%m.%Y %H:%M:%S') }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-4 fw-bold">Всего ботов:</div>
+                    <div class="col-8">
+                        <span class="badge bg-info fs-6">{{ user.bot_count }}</span>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-4 fw-bold">Возраст аккаунта:</div>
+                    <div class="col-8">
+                        {% set age = (now - user.created_at).days %}
+                        {% if age == 0 %}
+                        Сегодня
+                        {% elif age == 1 %}
+                        Вчера
+                        {% else %}
+                        {{ age }} {{ 'дней' if age % 10 in [2,3,4] and age % 100 not in [12,13,14] else 'дней' if age % 10 == 1 and age % 100 != 11 else 'дней' }}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- User Actions -->
+{% if user.id != current_user.id %}
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">
+                    <i class="fas fa-tools me-2 text-primary"></i>Действия с пользователем
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <button class="btn btn-{{ 'success' if not user.is_active else 'warning' }} w-100" 
+                                onclick="toggleUserStatus({{ user.id }})">
+                            <i class="fas fa-{{ 'check' if not user.is_active else 'ban' }} me-2"></i>
+                            {{ 'Активировать' if not user.is_active else 'Деактивировать' }}
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-{{ 'warning' if not user.is_admin else 'secondary' }} w-100" 
+                                onclick="toggleAdminStatus({{ user.id }})">
+                            <i class="fas fa-{{ 'shield-alt' if not user.is_admin else 'user' }} me-2"></i>
+                            {{ 'Сделать админом' if not user.is_admin else 'Убрать права админа' }}
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-outline-danger w-100" onclick="deleteUser({{ user.id }})">
+                            <i class="fas fa-trash me-2"></i>Удалить пользователя
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-outline-info w-100" onclick="resetUserPassword({{ user.id }})">
+                            <i class="fas fa-key me-2"></i>Сбросить пароль
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- User Bots -->
+<div class="row">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">
+                    <i class="fas fa-robot me-2 text-primary"></i>Боты пользователя ({{ bots|length }})
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                {% if bots %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>ID</th>
+                                <th>Название</th>
+                                <th>Токен</th>
+                                <th>Статус</th>
+                                <th>Дата создания</th>
+                                <th>Последнее обновление</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for bot in bots %}
+                            <tr>
+                                <td>{{ bot.id }}</td>
+                                <td>
+                                    <strong>{{ bot.name }}</strong>
+                                    {% if bot.token %}
+                                    <i class="fas fa-key text-success ms-1" title="Токен настроен"></i>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if bot.token %}
+                                    <code class="small">{{ bot.token[:20] }}...</code>
+                                    {% else %}
+                                    <span class="text-muted">Не настроен</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if bot.is_active %}
+                                    <span class="badge bg-success">Активен</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Неактивен</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ bot.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                                <td>{{ bot.updated_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button class="btn btn-outline-primary" 
+                                                onclick="viewBotConfig({{ bot.id }})" 
+                                                title="Просмотр конфигурации">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button class="btn btn-outline-success" 
+                                                onclick="downloadBotCode({{ bot.id }})" 
+                                                title="Скачать код">
+                                            <i class="fas fa-download"></i>
+                                        </button>
+                                        <button class="btn btn-outline-warning" 
+                                                onclick="toggleBotStatus({{ bot.id }})" 
+                                                title="{{ 'Активировать' if not bot.is_active else 'Деактивировать' }}">
+                                            <i class="fas fa-{{ 'check' if not bot.is_active else 'ban' }}"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-robot fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">У пользователя пока нет ботов</h5>
+                    <p class="text-muted">Пользователь еще не создал ни одного бота</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bot Config Modal -->
+<div class="modal fade" id="botConfigModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Конфигурация бота</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="botConfigContent">
+                    <!-- Content will be loaded here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleUserStatus(userId) {
+    fetch(`/api/admin/toggle-user-status/${userId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            showAlert('error', data.error);
+        }
+    })
+    .catch(error => {
+        showAlert('error', 'Произошла ошибка при изменении статуса пользователя');
+    });
+}
+
+function toggleAdminStatus(userId) {
+    fetch(`/api/admin/toggle-admin-status/${userId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            showAlert('error', data.error);
+        }
+    })
+    .catch(error => {
+        showAlert('error', 'Произошла ошибка при изменении прав пользователя');
+    });
+}
+
+function deleteUser(userId) {
+    if (confirm('Вы уверены, что хотите удалить этого пользователя? Это действие нельзя отменить.')) {
+        fetch(`/api/admin/delete-user/${userId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.href = '{{ url_for("admin_users") }}';
+            } else {
+                showAlert('error', data.error);
+            }
+        })
+        .catch(error => {
+            showAlert('error', 'Произошла ошибка при удалении пользователя');
+        });
+    }
+}
+
+function resetUserPassword(userId) {
+    if (confirm('Сбросить пароль пользователя? Новый пароль будет отправлен на email.')) {
+        // Здесь будет AJAX запрос для сброса пароля
+        showAlert('info', 'Функция сброса пароля будет добавлена позже');
+    }
+}
+
+function viewBotConfig(botId) {
+    // Здесь будет загрузка конфигурации бота
+    document.getElementById('botConfigContent').innerHTML = '<p class="text-center">Загрузка конфигурации...</p>';
+    $('#botConfigModal').modal('show');
+    
+    // Показываем заглушку
+    setTimeout(() => {
+        document.getElementById('botConfigContent').innerHTML = `
+            <div class="text-center py-4">
+                <i class="fas fa-cog fa-2x text-muted mb-3"></i>
+                <h5 class="text-muted">Конфигурация бота</h5>
+                <p class="text-muted">Функция просмотра конфигурации будет добавлена позже</p>
+            </div>
+        `;
+    }, 1000);
+}
+
+function downloadBotCode(botId) {
+    // Здесь будет скачивание кода бота
+    showAlert('info', 'Функция скачивания кода будет добавлена позже');
+}
+
+function toggleBotStatus(botId) {
+    // Здесь будет изменение статуса бота
+    showAlert('info', 'Функция изменения статуса бота будет добавлена позже');
+}
+
+function showAlert(type, message) {
+    const alertClass = type === 'error' ? 'danger' : type;
+    const alertHtml = `
+        <div class="alert alert-${alertClass} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    // Insert at the top of the content
+    const content = document.querySelector('main');
+    content.insertAdjacentHTML('afterbegin', alertHtml);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        const alert = document.querySelector('.alert');
+        if (alert) {
+            alert.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}
