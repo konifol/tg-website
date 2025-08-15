@@ -91,6 +91,90 @@
 .block-info i {
     margin-right: 5px;
 }
+
+.json-validation-feedback {
+    font-size: 0.875em;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+}
+
+.json-validation-feedback.text-success {
+    background-color: #d1e7dd;
+    border-color: #badbcc;
+    color: #0f5132;
+}
+
+.json-validation-feedback.text-danger {
+    background-color: #f8d7da;
+    border-color: #f5c2c7;
+    color: #842029;
+}
+
+.json-input:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.25);
+}
+
+.json-input.error {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.2rem rgba(220,53,69,0.25);
+}
+
+.json-input.valid {
+    border-color: #198754;
+    box-shadow: 0 0 0 0.2rem rgba(25,135,84,0.25);
+}
+
+.button-preview {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 1rem;
+}
+
+.button-preview h6 {
+    color: #495057;
+    margin-bottom: 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.button-preview .btn-group-vertical {
+    gap: 0.25rem;
+}
+
+.button-preview .btn-group {
+    gap: 0.25rem;
+}
+
+.button-preview .btn {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    min-width: 60px;
+}
+
+.button-preview .btn-outline-primary {
+    color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.button-preview .btn-outline-primary:hover {
+    background-color: #0d6efd;
+    color: white;
+}
+
+.button-preview .btn-outline-secondary {
+    color: #6c757d;
+    border-color: #6c757d;
+}
+
+.button-preview .btn-outline-secondary:hover {
+    background-color: #6c757d;
+    color: white;
+}
 </style>
 >>>>>>> main
 <div class="container-fluid mt-4">
@@ -389,6 +473,18 @@ const blockTypes = [
 let botBlocks = [];
 let blockCounter = 0;
 
+// Initialize button previews for existing blocks
+function initializeButtonPreviews() {
+    const jsonInputs = document.querySelectorAll('.json-input');
+    jsonInputs.forEach(input => {
+        const blockType = input.closest('.block-config').querySelector('.block-info strong').textContent;
+        if (blockType.includes('Инлайн кнопки') || blockType.includes('Клавиатура')) {
+            const blockTypeId = blockType.includes('Инлайн кнопки') ? 'inline_keyboard' : 'reply_keyboard';
+            previewButtons(input, blockTypeId);
+        }
+    });
+}
+
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
     loadSession();
@@ -566,15 +662,37 @@ function renderBlockConfig(block, index) {
                     `;
                     break;
                 case 'json':
+                    let placeholder = '';
+                    let helpText = '';
+                    
+                    if (field.name === 'buttons') {
+                        if (block.type === 'inline_keyboard') {
+                            placeholder = '[["Кнопка 1", "Кнопка 2"], ["Кнопка 3"]]';
+                            helpText = 'Формат: массив массивов. Каждый внутренний массив - это ряд кнопок. Пример: [["Да", "Нет"], ["Отмена"]]';
+                        } else if (block.type === 'reply_keyboard') {
+                            placeholder = '[["Кнопка 1", "Кнопка 2"], ["Кнопка 3", "Кнопка 4"]]';
+                            helpText = 'Формат: массив массивов. Каждый внутренний массив - это ряд кнопок. Пример: [["Да", "Нет"], ["Отмена"]]';
+                        } else {
+                            placeholder = '[["Кнопка 1"], ["Кнопка 2"]]';
+                            helpText = 'Введите JSON структуру кнопок';
+                        }
+                    } else {
+                        placeholder = '[["Кнопка 1"], ["Кнопка 2"]]';
+                        helpText = 'Введите JSON структуру кнопок';
+                    }
+                    
                     configHtml += `
                         <div class="field-group">
                             <label class="form-label ${requiredClass}">${field.label}</label>
-                            <textarea class="form-control" rows="4" 
-                                      onchange="updateBlockConfig(${index}, '${field.name}', this.value)"
-                                      placeholder='[["Кнопка 1"], ["Кнопка 2"]]'>${fieldValue}</textarea>
+                            <textarea class="form-control json-input" rows="4" 
+                                      onchange="updateBlockConfig(${index}, '${field.name}', this.value); previewButtons(this, '${block.type}')"
+                                      onblur="validateJSON(this, ${index}, '${field.name}')"
+                                      placeholder="${placeholder}">${fieldValue}</textarea>
                             <small class="form-text text-muted">
-                                <i class="fas fa-code"></i> Введите JSON структуру кнопок
+                                <i class="fas fa-code"></i> ${helpText}
                             </small>
+                            <div class="json-validation-feedback mt-1" style="display: none;"></div>
+                            ${field.name === 'buttons' ? `<div class="button-preview mt-2" style="display: none;"></div>` : ''}
                         </div>
                     `;
                     break;
@@ -683,13 +801,11 @@ function renderBlockConfig(block, index) {
         default:
             return '<p class="text-muted">Конфигурация недоступна</p>';
     }
->>>>>>> main
 }
 
 // Add new block
 function addBlock() {
     const blockType = blockTypes[0]; // Default to welcome block
-<<<<<<< HEAD
     addBlockByType(blockType.id);
 }
 
@@ -718,25 +834,10 @@ function addBlockByType(blockTypeId) {
             }
         }, 100);
     }
-=======
-    const newBlock = {
-        id: blockCounter++,
-        type: blockType.id,
-        name: blockType.name,
-        icon: blockType.icon,
-        color: blockType.color,
-        config: {}
-    };
-    
-    botBlocks.push(newBlock);
-    renderBlocks();
-    saveSession();
->>>>>>> main
 }
 
 // Remove block
 function removeBlock(index) {
-<<<<<<< HEAD
     if (confirm('Вы уверены, что хотите удалить этот блок?')) {
         botBlocks.splice(index, 1);
         renderBlocks();
@@ -759,57 +860,6 @@ function moveBlockDown(index) {
         [botBlocks[index], botBlocks[index + 1]] = [botBlocks[index + 1], botBlocks[index]];
         renderBlocks();
         saveSession();
-    }
-=======
-    botBlocks.splice(index, 1);
-    renderBlocks();
-    saveSession();
->>>>>>> main
-}
-
-// Update block configuration
-function updateBlockConfig(index, key, value) {
-    if (botBlocks[index]) {
-        if (!botBlocks[index].config) {
-            botBlocks[index].config = {};
-        }
-        botBlocks[index].config[key] = value;
-        saveSession();
-    }
-}
-
-<<<<<<< HEAD
-// Drag and drop functionality
-function handleDragStart(e) {
-    e.dataTransfer.setData('text/plain', e.target.dataset.blockType);
-    e.dataTransfer.effectAllowed = 'copy';
-}
-
-function handleDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
-}
-
-function handleDragEnter(e) {
-    e.preventDefault();
-    const dropZone = document.getElementById('botBlocks');
-    dropZone.classList.add('drag-over');
-}
-
-function handleDragLeave(e) {
-    e.preventDefault();
-    const dropZone = document.getElementById('botBlocks');
-    dropZone.classList.remove('drag-over');
-}
-
-function handleDrop(e) {
-    e.preventDefault();
-    const dropZone = document.getElementById('botBlocks');
-    dropZone.classList.remove('drag-over');
-    
-    const blockType = e.dataTransfer.getData('text/plain');
-    if (blockType) {
-        addBlockByType(blockType);
     }
 }
 
@@ -846,10 +896,7 @@ ${botName} - Telegram Bot
 """
 
 import telebot
-<<<<<<< HEAD
 from telebot import types
-=======
->>>>>>> main
 import logging
 from datetime import datetime
 
@@ -910,7 +957,50 @@ def send_about(message):
         bot.reply_to(message, "Произошла ошибка. Попробуйте позже.")
 `;
                 break;
-<<<<<<< HEAD
+            case 'message':
+                code += `
+@bot.message_handler(commands=['message'])
+def send_message(message):
+    """Отправить текстовое сообщение"""
+    try:
+        message_text = """${block.config.text || 'Это текстовое сообщение'}"""
+        bot.reply_to(message, message_text)
+        logger.info(f"User {message.from_user.id} requested message")
+    except Exception as e:
+        logger.error(f"Error in send_message: {e}")
+        bot.reply_to(message, "Произошла ошибка. Попробуйте позже.")
+`;
+                break;
+            case 'photo':
+                code += `
+@bot.message_handler(commands=['photo'])
+def send_photo(message):
+    """Отправить фото"""
+    try:
+        photo_url = """${block.config.photo_url || 'https://example.com/image.jpg'}"""
+        caption = """${block.config.caption || ''}"""
+        bot.send_photo(message.chat.id, photo_url, caption=caption)
+        logger.info(f"User {message.from_user.id} requested photo")
+    except Exception as e:
+        logger.error(f"Error in send_photo: {e}")
+        bot.reply_to(message, "Произошла ошибка. Попробуйте позже.")
+`;
+                break;
+            case 'document':
+                code += `
+@bot.message_handler(commands=['document'])
+def send_document(message):
+    """Отправить документ"""
+    try:
+        doc_url = """${block.config.document_url || 'https://example.com/document.pdf'}"""
+        caption = """${block.config.caption || ''}"""
+        bot.send_document(message.chat.id, doc_url, caption=caption)
+        logger.info(f"User {message.from_user.id} requested document")
+    except Exception as e:
+        logger.error(f"Error in send_document: {e}")
+        bot.reply_to(message, "Произошла ошибка. Попробуйте позже.")
+`;
+                break;
             case 'inline_keyboard':
                 if (block.config.text && block.config.buttons) {
                     code += `
@@ -922,13 +1012,26 @@ def show_menu(message):
         buttons_data = ${block.config.buttons}
         
         for row in buttons_data:
-            markup.row(*[types.InlineKeyboardButton(text=btn, callback_data=btn.lower().replace(' ', '_')) for btn in row])
+            markup.row(*[types.InlineKeyboardButton(text=btn, callback_data=btn.toLowerCase().replace(/\\s+/g, '_')) for btn in row])
         
         bot.reply_to(message, """${block.config.text}""", reply_markup=markup)
         logger.info(f"User {message.from_user.id} requested menu")
     except Exception as e:
         logger.error(f"Error in show_menu: {e}")
         bot.reply_to(message, "Произошла ошибка. Попробуйте позже.")
+
+# Обработчик нажатий на инлайн кнопки
+@bot.callback_query_handler(func=lambda call: True)
+def handle_callback_query(call):
+    """Обработчик нажатий на инлайн кнопки"""
+    try:
+        bot.answer_callback_query(call.id)
+        button_text = call.data.replace('_', ' ').title()
+        bot.send_message(call.message.chat.id, f"Вы выбрали: {button_text}")
+        logger.info(f"User {call.from_user.id} clicked button: {button_text}")
+    except Exception as e:
+        logger.error(f"Error in handle_callback_query: {e}")
+        bot.answer_callback_query(call.id, "Произошла ошибка")
 `;
                 }
                 break;
@@ -950,11 +1053,52 @@ def show_keyboard(message):
     except Exception as e:
         logger.error(f"Error in show_keyboard: {e}")
         bot.reply_to(message, "Произошла ошибка. Попробуйте позже.")
+
+@bot.message_handler(commands=['hide_keyboard'])
+def hide_keyboard(message):
+    """Скрыть клавиатуру"""
+    try:
+        markup = types.ReplyKeyboardRemove()
+        bot.reply_to(message, "Клавиатура скрыта", reply_markup=markup)
+        logger.info(f"User {message.from_user.id} hid keyboard")
+    except Exception as e:
+        logger.error(f"Error in hide_keyboard: {e}")
+        bot.reply_to(message, "Произошла ошибка. Попробуйте позже.")
 `;
                 }
                 break;
-=======
->>>>>>> main
+            case 'condition':
+                code += `
+@bot.message_handler(func=lambda message: True)
+def handle_condition(message):
+    """Обработчик условного блока"""
+    try:
+        condition_code = """${block.config.condition}"""
+        exec(condition_code)
+        logger.info(f"User {message.from_user.id} triggered condition block")
+    except Exception as e:
+        logger.error(f"Error in handle_condition: {e}")
+        bot.reply_to(message, "Произошла ошибка. Попробуйте позже.")
+`;
+                break;
+            case 'loop':
+                code += `
+@bot.message_handler(func=lambda message: True)
+def handle_loop(message):
+    """Обработчик цикла"""
+    try:
+        iterations = ${block.config.iterations || 1}
+        action_code = """${block.config.action || 'pass'}"""
+        
+        for i in range(iterations):
+            exec(action_code)
+            logger.info(f"User {message.from_user.id} completed loop iteration {i+1}")
+        logger.info(f"User {message.from_user.id} finished loop")
+    except Exception as e:
+        logger.error(f"Error in handle_loop: {e}")
+        bot.reply_to(message, "Произошла ошибка. Попробуйте позже.")
+`;
+                break;
             case 'custom':
                 if (block.config.keywords && block.config.response) {
                     const keywords = block.config.keywords.split(',').map(k => k.trim());
@@ -1000,6 +1144,8 @@ if __name__ == '__main__':
         logger.info("Bot stopped by user")
     except Exception as e:
         logger.error(f"Bot error: {e}")
+    finally:
+        logger.info("Bot stopped")
 `;
     
     return code;
@@ -1127,8 +1273,170 @@ function loadSession() {
     }
 }
 
+// Update block configuration
+function updateBlockConfig(index, key, value) {
+    if (botBlocks[index]) {
+        if (!botBlocks[index].config) {
+            botBlocks[index].config = {};
+        }
+        botBlocks[index].config[key] = value;
+        saveSession();
+    }
+}
+
+// Validate JSON input
+function validateJSON(textarea, blockIndex, fieldName) {
+    const blockElement = textarea.closest('.block-config');
+    const feedback = blockElement.querySelector('.json-validation-feedback');
+    const jsonString = textarea.value.trim();
+    
+    if (!jsonString) {
+        feedback.style.display = 'none';
+        textarea.classList.remove('error', 'valid');
+        return;
+    }
+    
+    let isValid = true;
+    let errorMessage = '';
+
+    try {
+        const parsed = JSON.parse(jsonString);
+        
+        // Дополнительная валидация для кнопок
+        if (fieldName === 'buttons') {
+            if (!Array.isArray(parsed)) {
+                throw new Error('Должен быть массив');
+            }
+            
+            for (let i = 0; i < parsed.length; i++) {
+                if (!Array.isArray(parsed[i])) {
+                    throw new Error(`Элемент ${i} должен быть массивом`);
+                }
+                
+                for (let j = 0; j < parsed[i].length; j++) {
+                    if (typeof parsed[i][j] !== 'string') {
+                        throw new Error(`Кнопка [${i}][${j}] должна быть строкой`);
+                    }
+                    
+                    if (parsed[i][j].trim() === '') {
+                        throw new Error(`Кнопка [${i}][${j}] не может быть пустой`);
+                    }
+                }
+            }
+        }
+        
+    } catch (e) {
+        isValid = false;
+        errorMessage = `Неверный формат JSON: ${e.message}`;
+    }
+
+    if (isValid) {
+        feedback.textContent = '✅ JSON валиден!';
+        feedback.style.display = 'block';
+        feedback.className = 'json-validation-feedback text-success';
+        textarea.classList.remove('error');
+        textarea.classList.add('valid');
+    } else {
+        feedback.textContent = `❌ ${errorMessage}`;
+        feedback.style.display = 'block';
+        feedback.className = 'json-validation-feedback text-danger';
+        textarea.classList.remove('valid');
+        textarea.classList.add('error');
+    }
+}
+
+// Preview buttons for inline_keyboard and reply_keyboard
+function previewButtons(textarea, blockType) {
+    const previewDiv = textarea.closest('.block-config').querySelector('.button-preview');
+    const jsonString = textarea.value.trim();
+
+    if (!jsonString) {
+        previewDiv.style.display = 'none';
+        return;
+    }
+
+    try {
+        const parsed = JSON.parse(jsonString);
+        let html = '<h6>Предварительный просмотр кнопок:</h6>';
+
+        if (blockType === 'inline_keyboard') {
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                html += '<div class="btn-group-vertical">';
+                parsed.forEach(row => {
+                    html += '<div class="btn-group">';
+                    row.forEach(btn => {
+                        html += `<button class="btn btn-sm btn-outline-primary me-1 mb-1">${btn}</button>`;
+                    });
+                    html += '</div>';
+                });
+                html += '</div>';
+            } else {
+                html += '<p class="text-muted">Кнопки не заданы или неверный формат.</p>';
+            }
+        } else if (blockType === 'reply_keyboard') {
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                html += '<div class="btn-group-vertical">';
+                parsed.forEach(row => {
+                    html += '<div class="btn-group">';
+                    row.forEach(btn => {
+                        html += `<button class="btn btn-sm btn-outline-secondary me-1 mb-1">${btn}</button>`;
+                    });
+                    html += '</div>';
+                });
+                html += '</div>';
+            } else {
+                html += '<p class="text-muted">Кнопки не заданы или неверный формат.</p>';
+            }
+        }
+        previewDiv.innerHTML = html;
+        previewDiv.style.display = 'block';
+    } catch (e) {
+        previewDiv.innerHTML = `<p class="text-danger">Ошибка парсинга JSON: ${e.message}</p>`;
+        previewDiv.style.display = 'block';
+    }
+}
+
+// Drag and drop functionality
+function handleDragStart(e) {
+    e.dataTransfer.setData('text/plain', e.target.dataset.blockType);
+    e.dataTransfer.effectAllowed = 'copy';
+}
+
+function handleDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+}
+
+function handleDragEnter(e) {
+    e.preventDefault();
+    const dropZone = document.getElementById('botBlocks');
+    dropZone.classList.add('drag-over');
+}
+
+function handleDragLeave(e) {
+    e.preventDefault();
+    const dropZone = document.getElementById('botBlocks');
+    dropZone.classList.remove('drag-over');
+}
+
+function handleDrop(e) {
+    e.preventDefault();
+    const dropZone = document.getElementById('botBlocks');
+    dropZone.classList.remove('drag-over');
+    
+    const blockType = e.dataTransfer.getData('text/plain');
+    if (blockType) {
+        addBlockByType(blockType);
+    }
+}
+
 
 // Auto-save on form changes
 document.getElementById('botForm').addEventListener('input', saveSession);
+
+// Initialize button previews when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(initializeButtonPreviews, 1000);
+});
 </script>
 {% endblock %}
