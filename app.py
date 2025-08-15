@@ -882,11 +882,38 @@ def create_bot_api():
 def get_bot_blocks():
     """Get available bot blocks with descriptions"""
     blocks = {
+        'welcome': {
+            'name': 'Приветствие',
+            'description': 'Отправляет приветственное сообщение при команде /start',
+            'icon': 'fas fa-hand-wave',
+            'color': 'primary',
+            'fields': [
+                {'name': 'message', 'type': 'textarea', 'label': 'Приветственное сообщение', 'required': True}
+            ]
+        },
+        'help': {
+            'name': 'Помощь',
+            'description': 'Показывает список доступных команд',
+            'icon': 'fas fa-question-circle',
+            'color': 'info',
+            'fields': [
+                {'name': 'commands', 'type': 'textarea', 'label': 'Список команд', 'required': True}
+            ]
+        },
+        'about': {
+            'name': 'О боте',
+            'description': 'Показывает информацию о боте',
+            'icon': 'fas fa-info-circle',
+            'color': 'secondary',
+            'fields': [
+                {'name': 'description', 'type': 'textarea', 'label': 'Описание бота', 'required': True}
+            ]
+        },
         'message': {
             'name': 'Сообщение',
             'description': 'Отправляет текстовое сообщение пользователю',
             'icon': 'fas fa-comment',
-            'color': 'primary',
+            'color': 'success',
             'fields': [
                 {'name': 'text', 'type': 'textarea', 'label': 'Текст сообщения', 'required': True}
             ]
@@ -905,8 +932,6 @@ def get_bot_blocks():
             'name': 'Документ',
             'description': 'Отправляет файл пользователю',
             'icon': 'fas fa-file',
-            'color': 'text-info',
-            'icon': 'fas fa-file',
             'color': 'info',
             'fields': [
                 {'name': 'document_url', 'type': 'url', 'label': 'URL документа', 'required': True},
@@ -915,17 +940,17 @@ def get_bot_blocks():
         },
         'inline_keyboard': {
             'name': 'Инлайн кнопки',
-            'description': 'Создает интерактивные кнопки под сообщением',
+            'description': 'Создает интерактивные кнопки под сообщением. Кнопки исчезают после нажатия.',
             'icon': 'fas fa-keyboard',
             'color': 'warning',
             'fields': [
-                {'name': 'buttons', 'type': 'json', 'label': 'JSON структура кнопок', 'required': True},
-                {'name': 'text', 'type': 'textarea', 'label': 'Текст сообщения с кнопками', 'required': True}
+                {'name': 'text', 'type': 'textarea', 'label': 'Текст сообщения с кнопками', 'required': True},
+                {'name': 'buttons', 'type': 'json', 'label': 'JSON структура кнопок', 'required': True}
             ]
         },
         'reply_keyboard': {
             'name': 'Клавиатура',
-            'description': 'Создает постоянную клавиатуру для пользователя',
+            'description': 'Создает постоянную клавиатуру для пользователя. Остается видимой до скрытия.',
             'icon': 'fas fa-keyboard',
             'color': 'secondary',
             'fields': [
@@ -953,6 +978,25 @@ def get_bot_blocks():
             'fields': [
                 {'name': 'iterations', 'type': 'number', 'label': 'Количество повторений', 'required': True},
                 {'name': 'action', 'type': 'text', 'label': 'Действие для повторения', 'required': True}
+            ]
+        },
+        'custom': {
+            'name': 'Кастомный ответ',
+            'description': 'Отвечает на определенные ключевые слова',
+            'icon': 'fas fa-magic',
+            'color': 'purple',
+            'fields': [
+                {'name': 'keywords', 'type': 'text', 'label': 'Ключевые слова (через запятую)', 'required': True},
+                {'name': 'response', 'type': 'textarea', 'label': 'Ответ на ключевые слова', 'required': True}
+            ]
+        },
+        'echo': {
+            'name': 'Эхо',
+            'description': 'Повторяет все сообщения пользователя',
+            'icon': 'fas fa-undo',
+            'color': 'light',
+            'fields': [
+                {'name': 'prefix', 'type': 'text', 'label': 'Префикс перед сообщением', 'required': False}
             ]
         }
     }
